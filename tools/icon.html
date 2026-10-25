@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Kampfschach – App-Icon</title>
+<style>body { margin: 0; background: #222; display: grid; place-items: center; height: 100vh; } canvas { width: 512px; height: 512px; }</style>
+</head>
+<body>
+<script type="module">
+// Rendert das App-Icon (weißer Marmor-Springer mit goldenem Ring) aus den echten Spielfiguren.
+// Mit ?save werden die Größen an tools/save-server.js geschickt (node tools/save-server.js public/icons).
+import * as THREE from 'three';
+import { figurine, KNIGHT_YAW } from '../src/render/pieces.js';
+
+const S = 1024;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(S, S, false);
+renderer.setPixelRatio(1);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.92;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const bg = document.createElement('canvas');
+bg.width = bg.height = 512;
+const g = bg.getContext('2d'), gr = g.createRadialGradient(256, 300, 20, 256, 300, 360);
+gr.addColorStop(0, '#3a2a1c'); gr.addColorStop(0.55, '#17121d'); gr.addColorStop(1, '#0c0a10');
+g.fillStyle = gr; g.fillRect(0, 0, 512, 512);
+scene.background = new THREE.CanvasTexture(bg);
+scene.background.colorSpace = THREE.SRGBColorSpace;
+
+scene.add(new THREE.HemisphereLight(0xaab6ff, 0x2a1d16, 0.6));
+const key = new THREE.DirectionalLight(0xffe0b5, 2.4); key.position.set(-3, 5, 4); scene.add(key);
+const rim = new THREE.DirectionalLight(0x8fa6ff, 1.6); rim.position.set(4, 3, -4); scene.add(rim);
+const glow = new THREE.PointLight(0xffb347, 2, 3, 2); glow.position.set(0.3, 0.25, 0.6); scene.add(glow);
+
+const knight = figurine('n', 'w');
+knight.rotation.y = Math.PI - 0.35 - KNIGHT_YAW.w;   // Profil, Maul nach links
+scene.add(knight);
+const ring = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.014, 8, 64), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffc45e).multiplyScalar(1.6) }));
+ring.rotation.x = Math.PI / 2;
+ring.position.y = 0.005;
+scene.add(ring);
+
+const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
+camera.position.set(0.15, 1.0, 2.55);
+camera.lookAt(0, 0.44, 0);
+renderer.render(scene, camera);
+
+if (new URLSearchParams(location.search).has('save')) {
+  for (const [name, size] of [['icon-512.png', 512], ['icon-192.png', 192], ['apple-touch-icon.png', 180]]) {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const x = c.getContext('2d');
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(renderer.domElement, 0, 0, size, size);
+    const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+    await fetch(`http://localhost:4632/save/${name}`, { method: 'POST', mode: 'no-cors', body: new Blob([blob], { type: 'text/plain' }) });
+  }
+  document.title = 'gespeichert';
+}
+</script>
+</body>
+</html>

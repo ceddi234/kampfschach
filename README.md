@@ -1,0 +1,46 @@
+# Kampfschach
+
+Animiertes 3D-Schach für zwei – online per Raum-Code oder am selben Gerät.
+Läuft komplett im Browser, ohne Konto und ohne eigenen Server.
+
+**Spielen:** https://ceddi234.github.io/kampfschach/
+
+## So spielt ihr zu zweit
+
+1. Einer klickt **Online-Spiel erstellen**, wählt seine Farbe und bekommt einen Code (z. B. `K7F2P`) plus Link.
+2. Den Link an den Gegner schicken – er landet direkt im Spiel (oder gibt den Code unter **Mit Code beitreten** ein).
+3. Bricht die Verbindung ab (WLAN weg, Laptop zu, Seite neu geladen), verbindet sich das Spiel von selbst wieder.
+   Die Partie bleibt im Browser gespeichert und lässt sich im Menü fortsetzen.
+
+## Als App auf dem Mac
+
+- **Safari:** Seite öffnen → Menü **Ablage → Zum Dock hinzufügen**. Danach startet Kampfschach wie eine normale App.
+- **Chrome / Edge:** Installieren-Symbol rechts in der Adresszeile → **Installieren**.
+- **iPhone/iPad:** Teilen → **Zum Home-Bildschirm**.
+
+## Regeln
+
+Alle offiziellen Schachregeln über [chess.js](https://github.com/jhlywa/chess.js): Rochade, en passant,
+Bauernumwandlung (mit Figurwahl), Schach, Matt, Patt, Remis durch dreifache Wiederholung, 50-Züge-Regel und
+zu wenig Material – dazu Remis anbieten und Aufgeben.
+
+## Technik
+
+- [three.js](https://threejs.org) – Brett und Figuren, komplett aus Code gebaut (keine 3D-Modelle)
+- [PeerJS](https://peerjs.com) – WebRTC-Verbindung direkt zwischen den beiden Browsern; der kostenlose
+  PeerJS-Server vermittelt nur den ersten Kontakt
+- [Vite](https://vite.dev) – Build, Deploy per GitHub Actions auf GitHub Pages
+
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm test         # Spiellogik + Online-Protokoll
+npm run build    # → dist/
+```
+
+## Wie es weitergeht
+
+1. ~~Spielbares Online-Schach~~ ✓
+2. Erwachende Figuren: Kampf-Animationen für jede Figur
+3. Schachuhr, Zug zurücknehmen (mit Zustimmung), Chat & Emotes
+4. Gegen den Computer (Stockfish)
