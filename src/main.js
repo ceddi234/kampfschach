@@ -5,6 +5,7 @@ import { Session } from './net/session.js';
 import { createTransport, newCode, cleanCode } from './net/peer.js';
 import { Hud } from './ui/hud.js';
 import { Match } from './game/match.js';
+import { TIME_CONTROLS } from './game/clock.js';
 import * as store from './store.js';
 
 let session = null;
@@ -18,7 +19,9 @@ const board = new Board3D(document.getElementById('stage'), { onSquare: clickSqu
 board.fights = store.loadFights();
 const hud = new Hud(document.getElementById('ui'), {
   name: (v) => store.saveName(v),
-  local: () => { store.clearGame(); attach(new Session({ mode: 'local' })); enterGame(); },
+  localForm: () => hud.localSetup(),
+  startLocal: () => { store.clearGame(); attach(new Session({ mode: 'local', clock: timeControl() })); enterGame(); },
+  time: (id) => { hud.setTime(id); store.saveTime(id); },
   create: () => hud.create(),
   open: (pref) => openRoom(pref),
   joinForm: () => hud.join({ code: '', name: store.loadName() }),
@@ -29,6 +32,17 @@ const hud = new Hud(document.getElementById('ui'), {
   copy: () => copyLink(),
   share: () => navigator.share?.({ title: 'Kampfschach', text: 'Spiel eine Partie Schach mit mir!', url: linkFor(session.code) }).catch(() => {}),
   draw: () => session?.offerDraw(),
+  undo: () => session?.requestUndo(),
+  undoYes: () => session?.answerUndo(true),
+  undoNo: () => session?.answerUndo(false),
+  tab: (t) => session && hud.showTab(t, session),
+  say: () => {
+    session?.say(hud.value('say'));
+    const input = document.querySelector('[name="say"]');
+    if (input) { input.value = ''; input.focus(); }
+  },
+  emote: (e) => session?.emote(e),
+  gear: () => session && hud.toggleGear(session),
   resign: async () => {
     if (await hud.confirm({ title: 'Wirklich aufgeben?', yes: 'Aufgeben', no: 'Weiterspielen' })) session?.resign();
   },
@@ -39,17 +53,31 @@ const hud = new Hud(document.getElementById('ui'), {
   rematchNo: () => session?.answerRematch(false),
   result: () => hud.showEnd(session),
   closeModal: () => hud.closeModal(),
-  view: () => board.resetView(),
+  view: () => { board.resetView(); if (session && hud.gearOpen) hud.toggleGear(session); },
   fights: () => {
     board.fights = hud.fights = !board.fights;
     store.saveFights(board.fights);
     hud.toast(board.fights ? 'Kämpfe an – ein Klick aufs Brett überspringt sie' : 'Kämpfe aus');
     if (session) hud.update(session);
   },
-  moves: () => hud.toggleSide(),
+  moves: () => session && hud.toggleSide(session),
   menu: () => leave(),
 });
 hud.fights = board.fights;
+hud.timeChoice = store.loadTime();
+
+// gewählte Bedenkzeit als Uhr-Einstellung (null = ohne Uhr)
+function timeControl() {
+  const t = TIME_CONTROLS.find((x) => x.id === hud.timeChoice);
+  return t?.base ? { base: t.base, inc: t.inc } : null;
+}
+
+// Uhr: Anzeige auffrischen und merken, wenn die Zeit abläuft
+setInterval(() => {
+  if (!session) return;
+  session.tick();
+  hud.updateClocks(session);
+}, 200);
 
 const myName = () => store.loadName().trim() || 'Spieler';
 const linkFor = (code) => `${location.origin}${location.pathname}#${code}`;
@@ -89,8 +117,22 @@ function attach(s) {
     if (hud.screen === 'game' && st === 'connected' && !wasConnected) hud.toast('Verbunden');
     wasConnected = st === 'connected';
   });
-  s.on('offer', (kind) => hud.toast(kind === 'draw' ? 'Remis-Angebot' : 'Revanche-Anfrage'));
-  s.on('declined', (kind) => hud.toast(kind === 'draw' ? 'Remis abgelehnt' : 'Revanche abgelehnt'));
+  s.on('undo', () => {
+    if (s !== session) return;
+    gen++;
+    pending = 0;
+    selected = null;
+    setBoard(() => s.match.board());
+    hud.toast('Zug zurückgenommen');
+  });
+  s.on('offer', (kind) => hud.toast({ draw: 'Remis-Angebot', undo: 'Bitte um Zurücknahme', rematch: 'Revanche-Anfrage' }[kind]));
+  s.on('declined', (kind) => hud.toast({ draw: 'Remis abgelehnt', undo: 'Zurücknahme abgelehnt', rematch: 'Revanche abgelehnt' }[kind]));
+  s.on('chat', (msg) => s === session && hud.onChat(s, msg));
+  s.on('emote', ({ me, e }) => s === session && hud.bubble(me ? 'left' : 'right', e));
+  s.on('outdated', () => {
+    if (hud.screen === 'game') hud.toast('Ihr habt verschiedene Versionen – bitte beide die Seite neu laden.', 6000);
+    else hud.setStatus('outdated');
+  });
   s.on('full', () => { hud.setStatus('full'); s.close(); session = null; });
   board.sync(s.match.board());
 }
@@ -98,7 +140,7 @@ function attach(s) {
 function openRoom(pref) {
   const code = newCode();
   const hostColor = pref === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : pref;
-  attach(new Session({ mode: 'host', transport: createTransport('host', code), code, hostColor, myName: myName() }));
+  attach(new Session({ mode: 'host', transport: createTransport('host', code), code, hostColor, myName: myName(), clock: timeControl() }));
   store.saveGame(session.snapshot());
   hud.waiting({ code, link: linkFor(code), status: session.connection });
 }
@@ -113,7 +155,8 @@ function joinRoom(raw) {
 
 function resume(g) {
   if (!g) return goHome();
-  const opts = { code: g.code, myName: myName(), opponentName: g.names?.opponent, hostColor: g.hostColor, moves: g.moves, result: g.result, game: g.game };
+  const opts = { code: g.code, myName: myName(), opponentName: g.names?.opponent, hostColor: g.hostColor, moves: g.moves, result: g.result,
+                 game: g.game, clock: g.clock ?? null, timeLog: g.timeLog ?? [] };
   try {
     attach(g.mode === 'local'
       ? new Session({ mode: 'local', ...opts })

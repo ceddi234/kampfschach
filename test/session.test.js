@@ -150,7 +150,7 @@ describe('Protokoll', () => {
     expect(valid({ t: 'move', lan: 'e7e8q', ply: 3, game: 1 })).toBe(true);
     expect(valid({ t: 'move', lan: 'e7e9', ply: 3, game: 1 })).toBe(false);
     expect(valid({ t: 'hello', v: 1, name: 'Max' })).toBe(true);
-    expect(valid({ t: 'hello', v: 2, name: 'Max' })).toBe(false);
+    expect(valid({ t: 'hello', v: 'neu', name: 'Max' })).toBe(false);   // Versionsvergleich macht die Session (→ "outdated")
     expect(valid({ t: 'state', moves: ['e2e4'], hostColor: 'w', result: null, game: 1, name: 'A' })).toBe(true);
     expect(valid({ t: 'state', moves: ['x'], hostColor: 'w', result: null, game: 1, name: 'A' })).toBe(false);
     expect(valid({ t: 'unbekannt' })).toBe(false);

@@ -15,6 +15,8 @@ export const RESULT_TEXT = {
   fifty: '50-Züge-Regel',
   resign: 'Aufgabe',
   agreement: 'Remis vereinbart',
+  timeout: 'Zeit abgelaufen',
+  'timeout-draw': 'Zeit abgelaufen – der Gegner kann nicht mehr mattsetzen',
 };
 
 export class Match {
@@ -52,6 +54,28 @@ export class Match {
 
   resign(color) { if (!this.over) this.result = { winner: other(color), reason: 'resign' }; }
   agreeDraw() { if (!this.over) this.result = { winner: null, reason: 'agreement' }; }
+
+  // Zeit abgelaufen: verloren – außer der Gegner hat nichts mehr, womit er mattsetzen könnte (dann Remis)
+  timeout(color) {
+    if (this.over) return;
+    this.result = this.#canMate(other(color)) ? { winner: other(color), reason: 'timeout' } : { winner: null, reason: 'timeout-draw' };
+  }
+
+  // n Halbzüge zurücknehmen
+  undo(n = 1) {
+    for (let i = 0; i < n; i++) if (!this.chess.undo()) break;
+    this.result = this.#detectEnd();
+  }
+
+  #canMate(color) {
+    let minor = 0;
+    for (const row of this.board()) for (const p of row) {
+      if (!p || p.color !== color) continue;
+      if ('pqr'.includes(p.type)) return true;
+      if ('bn'.includes(p.type)) minor++;
+    }
+    return minor >= 2;
+  }
 
   #detectEnd() {
     const c = this.chess;

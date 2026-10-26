@@ -8,9 +8,12 @@ eigene Figuren, eigene Animationen, eigener Name. Antworten/Texte auf Deutsch.
 
 ## Aufbau
 
-- `src/game/match.js` – Partie; alle Regeln aus chess.js, dazu Ergebnis/Aufgabe/Remis
-- `src/net/protocol.js` – Nachrichtenformat + Prüfung; `src/net/session.js` – Partie + Gegenüber (local/host/guest),
-  Gastgeber ist maßgeblich (schickt bei Abweichung den kompletten `state`), `game` zählt bei Revanche hoch
+- `src/game/match.js` – Partie; alle Regeln aus chess.js, dazu Ergebnis/Aufgabe/Remis/Zeit/Zurücknehmen
+- `src/game/clock.js` – Schachuhr (Restzeit je Seite, Fischer-Bonus, `TIME_CONTROLS`); läuft ab Halbzug 2, pausiert ohne Verbindung
+- `src/net/protocol.js` – Nachrichtenformat + Prüfung (`PROTOCOL` = 2; andere Version → `outdated`);
+  `src/net/session.js` – Partie + Gegenüber (local/host/guest). Gastgeber ist maßgeblich (schickt bei Abweichung und nach
+  Zurücknehmen den kompletten `state` inkl. Uhr), `game` zählt bei Revanche hoch. Züge melden die Restzeit des Ziehenden
+  (`left`), Zeitablauf meldet die betroffene Seite selbst (`flag`), der Gastgeber pfeift nach 2 s Kulanz selbst ab
 - `src/net/peer.js` – PeerJS-Transport: Gastgeber-ID `kampfschach-v1-<CODE>`, Heartbeat, Wiederverbinden
 - `src/render/pieces.js` – Figuren/Materialien prozedural (Lathe + Marmor-Shader, `AWAKE` mit leuchtenden Adern);
   `src/render/board3d.js` – Szene, Kamera, eigene Uhr (`time`, `advance(dt)`), Tweens, Kamerafahrt, Markierungen, Klicks
@@ -25,7 +28,7 @@ eigene Figuren, eigene Animationen, eigener Name. Antworten/Texte auf Deutsch.
 
 ## Arbeiten
 
-- `npm test` (vitest, 21 Tests), `npm run build`; Dev-Server über launch.json „kampfschach“ (Port 5180)
+- `npm test` (vitest, 35 Tests), `npm run build`; Dev-Server über launch.json „kampfschach“ (Port 5180)
 - Im Dev-Modus gibt es `window.__ks` (board, hud, session, state, `screen(feld)`) für Klick-Tests im Browser
 - Browser-Pane versteckt → `requestAnimationFrame` läuft nicht, Animationen hängen; in Tests `__ks.board.finishAll()`
   (einen Tick NACH dem Zug aufrufen). Zwei Test-Tabs teilen sich localStorage – Namen/gespeicherte Partie vermischen sich.
@@ -34,5 +37,5 @@ eigene Figuren, eigene Animationen, eigener Name. Antworten/Texte auf Deutsch.
 
 1. ✓ Spielbares Online-Schach (Raum-Code, Wiederverbinden, Revanche, Remis/Aufgabe, Handy-Layout)
 2. ✓ Erwachende Figuren: Kämpfe für alle 6 Angreifer × 5 Opfer, Überspringen per Klick, Schalter ⚔, König kippt bei Matt
-3. Schachuhr, Zug zurücknehmen mit Zustimmung, Chat/Emotes
+3. ✓ Schachuhr, Zug zurücknehmen mit Zustimmung, Chat/Emotes (v0.3)
 4. Gegen den Computer (Stockfish WASM)

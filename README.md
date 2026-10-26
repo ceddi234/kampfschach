@@ -17,6 +17,13 @@ der Schalter ⚔ schaltet die Kämpfe ab. Bei Schachmatt kippt der König um.
 3. Bricht die Verbindung ab (WLAN weg, Laptop zu, Seite neu geladen), verbindet sich das Spiel von selbst wieder.
    Die Partie bleibt im Browser gespeichert und lässt sich im Menü fortsetzen.
 
+## Extras
+
+- **Schachuhr:** beim Erstellen wählbar (ohne Uhr, 3+2, 5+3, 10 Min, 15+10). Die Uhr läuft ab dem zweiten Halbzug,
+  pausiert bei Verbindungsabbruch; wer keine Zeit mehr hat, verliert (Remis, wenn der Gegner nicht mehr mattsetzen kann).
+- **Zug zurücknehmen:** online nur mit Zustimmung des Gegners, am selben Gerät sofort.
+- **Chat & Emotes:** Reiter „Chat“ neben der Zugliste; Emotes steigen neben dem Spieler auf.
+
 ## Als App auf dem Mac
 
 - **Safari:** Seite öffnen → Menü **Ablage → Zum Dock hinzufügen**. Danach startet Kampfschach wie eine normale App.
@@ -47,5 +54,5 @@ npm run build    # → dist/
 
 1. ~~Spielbares Online-Schach~~ ✓
 2. ~~Erwachende Figuren: Kampf-Animationen für jede Figur~~ ✓
-3. Schachuhr, Zug zurücknehmen (mit Zustimmung), Chat & Emotes
+3. ~~Schachuhr, Zug zurücknehmen (mit Zustimmung), Chat & Emotes~~ ✓
 4. Gegen den Computer (Stockfish)

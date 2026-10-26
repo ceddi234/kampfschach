@@ -1,10 +1,13 @@
 // Alles Sichtbare außer dem 3D-Brett: Startmenü, Spielanzeige, Dialoge und kurze Hinweise.
 // Buttons tragen data-act="<aktion>" (+ optional data-arg); die Aktionen kommen aus main.js.
 import { COLOR_NAME, RESULT_TEXT, other } from '../game/match.js';
+import { TIME_CONTROLS, formatTime } from '../game/clock.js';
+import { EMOTES } from '../net/protocol.js';
 
 const GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
 const VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const START = { q: 1, r: 2, b: 2, n: 2, p: 8 };
+const LOW_TIME = 20e3;   // ab hier wird die Uhr rot
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // Zugliste mit deutschen Figurenkürzeln: D(ame), T(urm), L(äufer), S(pringer)
 const german = (san) => san.replace(/[QRBN]/g, (c) => ({ Q: 'D', R: 'T', B: 'L', N: 'S' })[c]);
@@ -19,6 +22,7 @@ export const STATUS_TEXT = {
   offline: 'Keine Verbindung zum Server – prüf dein Internet',
   full: 'Der Raum ist schon besetzt.',
   'bad-code': 'Der Code hat 5 Zeichen.',
+  outdated: 'Ihr habt verschiedene Versionen – bitte beide die Seite neu laden.',
 };
 
 // Material auf dem Brett zählen: was fehlt einer Seite, und wer steht wie viel besser?
@@ -33,9 +37,14 @@ export class Hud {
   constructor(root, actions) {
     this.actions = actions;
     this.screen = null;
-    this.sideOpen = false;
-    root.innerHTML = '<div id="screen"></div><div id="overlay"></div><div id="toast" class="toast"></div>';
-    this.el = { screen: root.querySelector('#screen'), overlay: root.querySelector('#overlay'), toast: root.querySelector('#toast') };
+    this.sideOpen = false;      // Zugliste/Chat auf dem Handy aufgeklappt
+    this.tab = 'moves';         // Reiter der Seitenleiste: moves | chat
+    this.unread = 0;
+    this.gearOpen = false;
+    this.timeChoice = 'none';
+    this.fights = true;
+    root.innerHTML = '<div id="screen"></div><div id="bubbles"></div><div id="overlay"></div><div id="toast" class="toast"></div>';
+    this.el = { screen: root.querySelector('#screen'), bubbles: root.querySelector('#bubbles'), overlay: root.querySelector('#overlay'), toast: root.querySelector('#toast') };
     root.addEventListener('click', (e) => {
       const b = e.target.closest('[data-act]');
       if (b && !b.disabled) actions[b.dataset.act]?.(b.dataset.arg);
@@ -70,21 +79,44 @@ export class Hud {
         ${resume}
         <button class="btn primary" data-act="create">Online-Spiel erstellen</button>
         <button class="btn" data-act="joinForm">Mit Code beitreten</button>
-        <button class="btn" data-act="local">Am selben Gerät spielen</button>
-        <p class="fine">Version 0.2 · beim Schlagen erwachen die Figuren – ein Klick aufs Brett überspringt den Kampf</p>
+        <button class="btn" data-act="localForm">Am selben Gerät spielen</button>
+        <p class="fine">Version 0.3 · Schachuhr, Zug zurücknehmen, Chat · beim Schlagen erwachen die Figuren</p>
       </section>`);
+  }
+
+  #timePicker() {
+    return `
+      <span class="label">Bedenkzeit</span>
+      <div class="seg">${TIME_CONTROLS.map((t) => `<button class="${t.id === this.timeChoice ? 'on' : ''}" data-act="time" data-arg="${t.id}">${t.label}</button>`).join('')}</div>`;
+  }
+
+  setTime(id) {
+    this.timeChoice = id;
+    this.el.screen.querySelectorAll('[data-act="time"]').forEach((b) => b.classList.toggle('on', b.dataset.arg === id));
   }
 
   create() {
     this.#show('create', `
       <section class="card lobby">
         <h2>Neues Online-Spiel</h2>
-        <p class="tag">Welche Farbe willst du spielen?</p>
+        ${this.#timePicker()}
+        <span class="label">Deine Farbe</span>
         <div class="choice">
           <button class="btn" data-act="open" data-arg="w">${glyph('k', 'w')} Weiß</button>
           <button class="btn" data-act="open" data-arg="random">🎲 Zufall</button>
           <button class="btn" data-act="open" data-arg="b">${glyph('k', 'b')} Schwarz</button>
         </div>
+        <button class="btn ghost" data-act="home">Zurück</button>
+      </section>`);
+  }
+
+  localSetup() {
+    this.#show('local', `
+      <section class="card lobby">
+        <h2>Am selben Gerät</h2>
+        <p class="tag">Ihr zieht abwechselnd am selben Bildschirm.</p>
+        ${this.#timePicker()}
+        <button class="btn primary" data-act="startLocal">Partie starten</button>
         <button class="btn ghost" data-act="home">Zurück</button>
       </section>`);
   }
@@ -124,11 +156,18 @@ export class Hud {
 
   // ---------- Spiel ----------
   game() {
+    this.tab = 'moves';
+    this.unread = 0;
+    this.gearOpen = false;
     this.#show('game', '<div class="hud" id="hud"></div>');
   }
 
   update(s) {
     if (this.screen !== 'game') return;
+    // Chat-Entwurf über das Neuzeichnen retten
+    const draft = this.el.screen.querySelector('[name="say"]');
+    const keep = draft && { value: draft.value, focus: document.activeElement === draft };
+
     const m = s.match, over = m.over, mat = material(m.board());
     const nameOf = (c) => !s.online ? COLOR_NAME[c] : c === s.myColor ? `${esc(s.names.me)} <i>(du)</i>` : esc(s.names.opponent || 'Gegner');
     const left = s.online ? s.myColor : 'w', right = other(left);
@@ -136,8 +175,11 @@ export class Hud {
       const adv = c === 'w' ? mat.diff : -mat.diff;
       return `
         <div class="player ${side} ${!over && m.turn === c ? 'active' : ''}">
-          <div class="who"><span class="dot ${c}"></span>${nameOf(c)}${s.online ? ` <small>${COLOR_NAME[c]}</small>` : ''}</div>
-          <div class="caps">${mat.lost[other(c)].map((t) => glyph(t, other(c))).join('')}${adv > 0 ? `<em>+${adv}</em>` : ''}</div>
+          <div class="info">
+            <div class="who"><span class="dot ${c}"></span>${nameOf(c)}${s.online ? ` <small>${COLOR_NAME[c]}</small>` : ''}</div>
+            <div class="caps">${mat.lost[other(c)].map((t) => glyph(t, other(c))).join('')}${adv > 0 ? `<em>+${adv}</em>` : ''}</div>
+          </div>
+          ${s.clock ? `<div class="clock" data-color="${c}"></div>` : ''}
         </div>`;
     };
 
@@ -151,18 +193,18 @@ export class Hud {
       ? `<div class="conn">${STATUS_TEXT[s.connection] || s.connection}${s.mode === 'host' && s.connection === 'waiting' ? ` · Code <b class="mono">${esc(s.code)}</b> <button class="mini" data-act="copy">Link kopieren</button>` : ''}</div>`
       : '';
 
+    const opp = esc(s.names.opponent || 'Dein Gegner');
     let banner = '';
-    if (s.offers.drawReceived) banner = this.#banner(`${esc(s.names.opponent || 'Dein Gegner')} bietet Remis an.`, 'drawYes', 'drawNo');
-    else if (s.offers.rematchReceived) banner = this.#banner(`${esc(s.names.opponent || 'Dein Gegner')} möchte eine Revanche.`, 'rematchYes', 'rematchNo');
+    if (s.offers.drawReceived) banner = this.#banner(`${opp} bietet Remis an.`, 'drawYes', 'drawNo');
+    else if (s.offers.undoReceived !== null) banner = this.#banner(`${opp} möchte den letzten Zug zurücknehmen.`, 'undoYes', 'undoNo');
+    else if (s.offers.rematchReceived) banner = this.#banner(`${opp} möchte eine Revanche.`, 'rematchYes', 'rematchNo');
 
-    const san = m.san.map(german);
-    let rows = '';
-    for (let i = 0; i < san.length; i += 2) rows += `<li><span class="n">${i / 2 + 1}.</span><span>${san[i]}</span><span>${san[i + 1] || ''}</span></li>`;
-
+    const tab = s.online ? this.tab : 'moves';
     const actions = over
       ? `<button class="btn primary" data-act="rematch" ${s.offers.rematchSent ? 'disabled' : ''}>${s.offers.rematchSent ? 'Revanche angefragt …' : 'Revanche'}</button>
          <button class="btn" data-act="result">Ergebnis</button>`
-      : `<button class="btn" data-act="draw" title="Remis anbieten" ${s.offers.drawSent || (s.online && !s.connected) ? 'disabled' : ''}>${s.offers.drawSent ? 'Remis …' : 'Remis'}</button>
+      : `<button class="btn" data-act="undo" title="Zug zurücknehmen${s.online ? ' (der Gegner muss zustimmen)' : ''}" ${s.canUndo() ? '' : 'disabled'}>${s.offers.undoSent ? 'Zurück …' : '↶ Zurück'}</button>
+         <button class="btn" data-act="draw" title="Remis anbieten" ${s.offers.drawSent || (s.online && !s.connected) ? 'disabled' : ''}>${s.offers.drawSent ? 'Remis …' : 'Remis'}</button>
          <button class="btn" data-act="resign">Aufgeben</button>`;
 
     this.el.screen.querySelector('#hud').innerHTML = `
@@ -171,24 +213,93 @@ export class Hud {
       ${conn}
       ${banner}
       <aside class="side ${this.sideOpen ? 'open' : ''}">
-        <h3>Züge</h3>
-        <ol class="moves">${rows || '<li class="empty">noch keine</li>'}</ol>
+        ${s.online ? `<div class="tabs">
+          <button class="${tab === 'moves' ? 'on' : ''}" data-act="tab" data-arg="moves">Züge</button>
+          <button class="${tab === 'chat' ? 'on' : ''}" data-act="tab" data-arg="chat">Chat${this.unread ? ` <i class="badge">${this.unread}</i>` : ''}</button>
+        </div>` : '<h3>Züge</h3>'}
+        ${tab === 'chat' ? this.#chat(s) : `<ol class="moves">${this.#moves(m)}</ol>`}
       </aside>
+      ${this.gearOpen ? `<div class="gear card">
+        <button class="btn" data-act="fights">⚔︎ Kämpfe: ${this.fights ? 'an' : 'aus'}</button>
+        <button class="btn" data-act="view">Ansicht zurücksetzen</button>
+      </div>` : ''}
       <nav class="actions">
         ${actions}
-        <button class="btn" data-act="fights" title="Kampf-Animationen beim Schlagen an/aus">⚔︎ ${this.fights ? 'an' : 'aus'}</button>
-        <button class="btn" data-act="view" title="Blick zurücksetzen">Ansicht</button>
-        <button class="btn only-small" data-act="moves">Züge</button>
+        <button class="btn only-small" data-act="moves">${s.online ? 'Chat' : 'Züge'}${this.unread ? ` <i class="badge">${this.unread}</i>` : ''}</button>
+        <button class="btn" data-act="gear" title="Einstellungen">⚙︎</button>
         <button class="btn" data-act="menu">Menü</button>
       </nav>`;
-    const list = this.el.screen.querySelector('.moves');
-    list.scrollTop = list.scrollHeight;
+    const list = this.el.screen.querySelector('.moves, .msgs');
+    if (list) list.scrollTop = list.scrollHeight;
+    if (keep) {
+      const input = this.el.screen.querySelector('[name="say"]');
+      if (input) { input.value = keep.value; if (keep.focus) input.focus(); }
+    }
+    this.updateClocks(s);
     if (this.modal === 'end') this.showEnd(s);
   }
 
-  toggleSide() {
+  // nur die Uhren neu schreiben (läuft mehrmals pro Sekunde)
+  updateClocks(s) {
+    if (this.screen !== 'game' || !s.clock) return;
+    for (const el of this.el.screen.querySelectorAll('.clock')) {
+      const c = el.dataset.color, ms = s.clock.left(c);
+      el.textContent = formatTime(ms);
+      el.classList.toggle('run', s.clock.running === c);
+      el.classList.toggle('low', ms < LOW_TIME);
+    }
+  }
+
+  #moves(m) {
+    const san = m.san.map(german);
+    let rows = '';
+    for (let i = 0; i < san.length; i += 2) rows += `<li><span class="n">${i / 2 + 1}.</span><span>${san[i]}</span><span>${san[i + 1] || ''}</span></li>`;
+    return rows || '<li class="empty">noch keine</li>';
+  }
+
+  #chat(s) {
+    const msgs = s.chat.map((c) => `<li class="${c.me ? 'me' : 'opp'}"><b>${c.me ? 'Du' : esc(s.names.opponent || 'Gegner')}</b>${esc(c.text)}</li>`).join('');
+    return `
+      <ol class="msgs">${msgs || '<li class="empty">Noch nichts geschrieben.</li>'}</ol>
+      <div class="emotes">${EMOTES.map((e) => `<button data-act="emote" data-arg="${e}">${e}</button>`).join('')}</div>
+      <form class="say" data-submit="say"><input name="say" maxlength="200" placeholder="Nachricht …" autocomplete="off" enterkeyhint="send"><button class="btn" title="Senden">↵</button></form>`;
+  }
+
+  showTab(tab, s) {
+    this.tab = tab;
+    if (tab === 'chat') this.unread = 0;
+    this.update(s);
+    if (tab === 'chat') this.el.screen.querySelector('[name="say"]')?.focus();
+  }
+
+  toggleSide(s) {
     this.sideOpen = !this.sideOpen;
-    this.el.screen.querySelector('.side')?.classList.toggle('open', this.sideOpen);
+    if (this.sideOpen && s.online) this.showTab('chat', s);
+    else this.el.screen.querySelector('.side')?.classList.toggle('open', this.sideOpen);
+  }
+
+  toggleGear(s) {
+    this.gearOpen = !this.gearOpen;
+    this.update(s);
+  }
+
+  // neue Chatnachricht: im offenen Chat einfach anzeigen, sonst zählen und kurz einblenden
+  onChat(s, msg) {
+    const visible = this.tab === 'chat' && (this.sideOpen || innerWidth > 760);
+    if (!msg.me && !visible) {
+      this.unread++;
+      this.toast(`${s.names.opponent || 'Gegner'}: ${msg.text}`, 3500);
+    }
+    this.update(s);
+  }
+
+  // Emote steigt neben dem Spieler auf, der es geschickt hat
+  bubble(side, e) {
+    const b = document.createElement('div');
+    b.className = `bubble ${side}`;
+    b.textContent = e;
+    this.el.bubbles.appendChild(b);
+    setTimeout(() => b.remove(), 2400);
   }
 
   #banner(text, yes, no) {
@@ -244,7 +355,9 @@ export class Hud {
     let title = 'Remis';
     if (r.winner) title = !s.online ? `${COLOR_NAME[r.winner]} gewinnt` : r.winner === s.myColor ? 'Gewonnen!' : 'Verloren';
     let why = RESULT_TEXT[r.reason];
-    if (r.reason === 'resign') why = !s.online ? `${COLOR_NAME[other(r.winner)]} hat aufgegeben` : r.winner === s.myColor ? `${esc(s.names.opponent || 'Dein Gegner')} hat aufgegeben` : 'Du hast aufgegeben';
+    const iWon = r.winner === s.myColor, opp = esc(s.names.opponent || 'Dein Gegner');
+    if (r.reason === 'resign') why = !s.online ? `${COLOR_NAME[other(r.winner)]} hat aufgegeben` : iWon ? `${opp} hat aufgegeben` : 'Du hast aufgegeben';
+    if (r.reason === 'timeout') why = !s.online ? `Die Zeit von ${COLOR_NAME[other(r.winner)]} ist abgelaufen` : iWon ? `Die Zeit von ${opp} ist abgelaufen` : 'Deine Zeit ist abgelaufen';
     this.#modal('end', `
       <h2 class="big">${title}</h2>
       <p class="tag">${why}</p>
