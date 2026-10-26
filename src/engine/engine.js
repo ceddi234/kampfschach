@@ -20,6 +20,7 @@ export class Engine {
     this.waiters = [];       // warten auf eine Antwortzeile, die mit "until" beginnt
     this.job = 0;            // zählt hoch, wenn eine Suche abgebrochen wird
     this.score = null;       // letzte Bewertung in Centipawns aus Sicht der Engine (Matt = ±10000)
+    this.loaded = false;
   }
 
   // Engine laden (mehrfach aufrufbar)
@@ -29,8 +30,8 @@ export class Engine {
       this.worker = new Worker(new URL(FILE, document.baseURI));
       this.worker.onmessage = (e) => this.#line(String(e.data));
       this.worker.onerror = reject;
-      this.#ask('uci', 'uciok').then(() => this.#ask('isready', 'readyok')).then(resolve);
-      setTimeout(() => reject(new Error('Stockfish antwortet nicht')), 30000);   // z. B. sehr alter Browser
+      this.#ask('uci', 'uciok').then(() => this.#ask('isready', 'readyok')).then(() => { this.loaded = true; resolve(); });
+      setTimeout(() => reject(new Error('Stockfish antwortet nicht')), 120000);   // z. B. sehr alter Browser oder keine Verbindung
     }).catch((e) => {
       this.worker?.terminate();
       this.worker = this.ready = null;

@@ -162,19 +162,23 @@ function startCpu(pref) {
 }
 
 // ist der Computer dran: Stockfish fragen, kurz "nachdenken" lassen und erst nach den Animationen ziehen
-async function maybeEngineMove() {
+async function maybeEngineMove(attempt = 1) {
   const s = session;
   if (!s?.engineTurn() || thinking) return;
   thinking = true;
-  const job = ++thinkJob, fen = s.match.chess.fen();
+  const job = ++thinkJob, fen = s.match.chess.fen(), e = getEngine();
+  if (!e.loaded) { hud.engineLoading = true; hud.update(s); }   // beim ersten Mal kommen ≈ 7 MB
   try {
-    const [lan] = await Promise.all([getEngine().bestMove(fen, levelById(s.level)), sleep(350 + Math.random() * 450)]);
+    const [lan] = await Promise.all([e.bestMove(fen, levelById(s.level)), sleep(350 + Math.random() * 450)]);
     while (pending && job === thinkJob) await queue;
     if (job === thinkJob && s === session && lan && s.match.chess.fen() === fen) s.engineMove(lan);
   } catch {
-    if (job === thinkJob) hud.toast('Der Computer ließ sich nicht starten – bitte die Seite neu laden.', 5000);
+    if (job !== thinkJob) return;
+    hud.toast(attempt < 3 ? 'Der Computer lädt noch – neuer Versuch …' : 'Der Computer ließ sich nicht starten – bitte die Seite neu laden.', 5000);
+    if (attempt < 3) setTimeout(() => s === session && maybeEngineMove(attempt + 1), 3000);
   } finally {
     if (job === thinkJob) thinking = false;
+    if (hud.engineLoading) { hud.engineLoading = false; if (s === session) hud.update(s); }
   }
 }
 

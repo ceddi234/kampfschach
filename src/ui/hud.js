@@ -212,7 +212,7 @@ export class Hud {
     if (over) line = this.#resultLine(s);
     else if (m.inCheck()) line = '<b class="warn">Schach!</b>';
     else if (s.mode === 'local') line = `${COLOR_NAME[m.turn]} ist am Zug`;
-    else if (s.mode === 'cpu') line = m.turn === s.myColor ? '<b>Du bist am Zug</b>' : 'Der Computer denkt nach …';
+    else if (s.mode === 'cpu') line = m.turn === s.myColor ? '<b>Du bist am Zug</b>' : this.engineLoading ? 'Der Computer wird geladen …' : 'Der Computer denkt nach …';
     else line = m.turn === s.myColor ? '<b>Du bist am Zug</b>' : `${esc(s.names.opponent || 'Gegner')} ist am Zug`;
 
     const conn = s.online && !s.connected
