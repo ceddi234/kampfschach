@@ -6,6 +6,7 @@ import { createTransport, newCode, cleanCode } from './net/peer.js';
 import { Hud } from './ui/hud.js';
 import { Match } from './game/match.js';
 import { TIME_CONTROLS } from './game/clock.js';
+import { Engine, levelById } from './engine/engine.js';
 import * as store from './store.js';
 
 let session = null;
@@ -14,12 +15,18 @@ let queue = Promise.resolve(); // Zug-Animationen laufen nacheinander
 let pending = 0;               // noch nicht fertig animierte Züge
 let gen = 0;                   // zählt hoch, wenn der Stand komplett neu gesetzt wird
 let endShown = false;
+let engine = null;             // Stockfish, erst bei Bedarf geladen
+let thinkJob = 0;              // zählt hoch, wenn eine laufende Computersuche verworfen wird
+let thinking = false;
 
 const board = new Board3D(document.getElementById('stage'), { onSquare: clickSquare, canSelect: selectable });
 board.fights = store.loadFights();
 const hud = new Hud(document.getElementById('ui'), {
   name: (v) => store.saveName(v),
   localForm: () => hud.localSetup(),
+  cpuForm: () => { hud.cpuSetup(); getEngine().start().catch(() => {}); },   // Engine schon mal laden
+  level: (id) => { hud.setLevel(+id); store.saveLevel(+id); },
+  startCpu: (pref) => startCpu(pref),
   startLocal: () => { store.clearGame(); attach(new Session({ mode: 'local', clock: timeControl() })); enterGame(); },
   time: (id) => { hud.setTime(id); store.saveTime(id); },
   create: () => hud.create(),
@@ -65,6 +72,9 @@ const hud = new Hud(document.getElementById('ui'), {
 });
 hud.fights = board.fights;
 hud.timeChoice = store.loadTime();
+hud.levelChoice = store.loadLevel();
+const getEngine = () => (engine ||= new Engine());
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // gewählte Bedenkzeit als Uhr-Einstellung (null = ohne Uhr)
 function timeControl() {
@@ -98,9 +108,11 @@ function attach(s) {
     hud.update(s);
     marks();
     checkEnd();
+    maybeEngineMove();
   });
   s.on('reset', () => {
     if (s !== session) return;
+    stopThinking();
     gen++;
     pending = 0;
     selected = null;
@@ -119,6 +131,7 @@ function attach(s) {
   });
   s.on('undo', () => {
     if (s !== session) return;
+    stopThinking();
     gen++;
     pending = 0;
     selected = null;
@@ -134,7 +147,41 @@ function attach(s) {
     else hud.setStatus('outdated');
   });
   s.on('full', () => { hud.setStatus('full'); s.close(); session = null; });
+  // Remis nimmt der Computer an, wenn er selbst nicht besser steht und schon eine Weile gespielt wurde
+  s.cpuAcceptsDraw = () => engine?.score !== null && engine?.score !== undefined && engine.score <= 30 && s.match.ply >= 20;
   board.sync(s.match.board());
+}
+
+function startCpu(pref) {
+  const color = pref === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : pref, level = hud.levelChoice;
+  store.clearGame();
+  getEngine().newGame();
+  attach(new Session({ mode: 'cpu', hostColor: color, level, myName: myName(), opponentName: `Computer · ${levelById(level).name}`, clock: timeControl() }));
+  enterGame();
+  maybeEngineMove();
+}
+
+// ist der Computer dran: Stockfish fragen, kurz "nachdenken" lassen und erst nach den Animationen ziehen
+async function maybeEngineMove() {
+  const s = session;
+  if (!s?.engineTurn() || thinking) return;
+  thinking = true;
+  const job = ++thinkJob, fen = s.match.chess.fen();
+  try {
+    const [lan] = await Promise.all([getEngine().bestMove(fen, levelById(s.level)), sleep(350 + Math.random() * 450)]);
+    while (pending && job === thinkJob) await queue;
+    if (job === thinkJob && s === session && lan && s.match.chess.fen() === fen) s.engineMove(lan);
+  } catch {
+    if (job === thinkJob) hud.toast('Der Computer ließ sich nicht starten – bitte die Seite neu laden.', 5000);
+  } finally {
+    if (job === thinkJob) thinking = false;
+  }
+}
+
+function stopThinking() {
+  thinkJob++;
+  thinking = false;
+  engine?.cancel();
 }
 
 function openRoom(pref) {
@@ -158,14 +205,15 @@ function resume(g) {
   const opts = { code: g.code, myName: myName(), opponentName: g.names?.opponent, hostColor: g.hostColor, moves: g.moves, result: g.result,
                  game: g.game, clock: g.clock ?? null, timeLog: g.timeLog ?? [] };
   try {
-    attach(g.mode === 'local'
-      ? new Session({ mode: 'local', ...opts })
+    attach(g.mode === 'local' || g.mode === 'cpu'
+      ? new Session({ mode: g.mode, ...opts, level: g.level ?? null })
       : new Session({ mode: g.mode, transport: createTransport(g.mode, g.code), ...opts }));
   } catch {
     store.clearGame();     // gespeicherter Stand ist kaputt
     return goHome();
   }
   enterGame();
+  maybeEngineMove();
 }
 
 const sideInset = () => (innerWidth > 760 ? 200 : 0);
@@ -182,7 +230,7 @@ function enterGame() {
   if (location.hash) history.replaceState(null, '', location.pathname + location.search);
 }
 
-function orient() { board.setOrientation(session.online ? session.myColor : 'w'); }
+function orient() { board.setOrientation(session.mode === 'local' ? 'w' : session.myColor); }
 
 async function leave() {
   const s = session;
@@ -192,6 +240,7 @@ async function leave() {
 }
 
 function goHome() {
+  stopThinking();
   session?.close();
   session = null;
   gen++;

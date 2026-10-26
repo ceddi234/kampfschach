@@ -208,3 +208,54 @@ describe('Session: Chat und Emotes', () => {
     expect(valid({ t: 'chat', text: '' })).toBe(false);
   });
 });
+
+describe('Session: gegen den Computer', () => {
+  it('Mensch zieht seine Farbe, der Computer die andere', () => {
+    const s = new Session({ mode: 'cpu', hostColor: 'b', level: 3 });
+    expect(s.online).toBe(false);
+    expect(s.myColor).toBe('b');
+    expect(s.engineTurn()).toBe(true);                           // Weiß = Computer fängt an
+    expect(s.move({ from: 'e2', to: 'e4' })).toBeNull();         // Mensch darf nicht für den Computer ziehen
+    expect(s.engineMove('e2e4')?.san).toBe('e4');
+    expect(s.engineTurn()).toBe(false);
+    expect(s.engineMove('e7e5')).toBeNull();                     // und der Computer nicht für den Menschen
+    expect(s.move({ from: 'e7', to: 'e5' })?.san).toBe('e5');
+  });
+
+  it('Zurücknehmen geht bis vor den eigenen letzten Zug, auch während der Computer denkt', () => {
+    const s = new Session({ mode: 'cpu', hostColor: 'w', level: 3 });
+    expect(s.canUndo()).toBe(false);
+    s.move({ from: 'e2', to: 'e4' });
+    s.engineMove('e7e5');
+    s.requestUndo();                                             // Mensch ist dran → 2 Halbzüge
+    expect(s.match.ply).toBe(0);
+    s.move({ from: 'd2', to: 'd4' });
+    s.requestUndo();                                             // Computer wäre dran → 1 Halbzug
+    expect(s.match.ply).toBe(0);
+  });
+
+  it('Remis nimmt der Computer nur an, wenn er es will; Aufgeben trifft den Menschen', () => {
+    const s = new Session({ mode: 'cpu', hostColor: 'w', level: 3 });
+    const declined = [];
+    s.on('declined', (k) => declined.push(k));
+    s.offerDraw();
+    expect(declined).toEqual(['draw']);
+    expect(s.match.over).toBe(false);
+    s.cpuAcceptsDraw = () => true;
+    s.offerDraw();
+    expect(s.match.result).toEqual({ winner: null, reason: 'agreement' });
+    const t = new Session({ mode: 'cpu', hostColor: 'b', level: 3 });
+    t.resign();
+    expect(t.match.result).toEqual({ winner: 'w', reason: 'resign' });
+  });
+
+  it('Revanche behält die Farbe, der Spielstand merkt sich die Stärke', () => {
+    const s = new Session({ mode: 'cpu', hostColor: 'b', level: 5 });
+    s.engineMove('e2e4');
+    s.resign();
+    s.offerRematch();
+    expect(s.myColor).toBe('b');
+    expect(s.match.ply).toBe(0);
+    expect(s.snapshot()).toMatchObject({ mode: 'cpu', hostColor: 'b', level: 5 });
+  });
+});

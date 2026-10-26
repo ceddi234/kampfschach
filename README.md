@@ -24,6 +24,13 @@ der Schalter ⚔ schaltet die Kämpfe ab. Bei Schachmatt kippt der König um.
 - **Zug zurücknehmen:** online nur mit Zustimmung des Gegners, am selben Gerät sofort.
 - **Chat & Emotes:** Reiter „Chat“ neben der Zugliste; Emotes steigen neben dem Spieler auf.
 
+## Gegen den Computer
+
+Sechs Stufen von *Anfänger* bis *Großmeister*, auf Wunsch mit Schachuhr. Der Computer ist
+[Stockfish](https://stockfishchess.org) (Stockfish.js 18, kleine Single-Thread-Variante, ≈ 7 MB), läuft komplett im
+Browser und wird erst geladen, wenn du ihn brauchst. Zurücknehmen geht sofort; Remis nimmt er nur an, wenn er selbst
+nicht besser steht.
+
 ## Als App auf dem Mac
 
 - **Safari:** Seite öffnen → Menü **Ablage → Zum Dock hinzufügen**. Danach startet Kampfschach wie eine normale App.
@@ -42,6 +49,8 @@ zu wenig Material – dazu Remis anbieten und Aufgeben.
 - [PeerJS](https://peerjs.com) – WebRTC-Verbindung direkt zwischen den beiden Browsern; der kostenlose
   PeerJS-Server vermittelt nur den ersten Kontakt
 - [Vite](https://vite.dev) – Build, Deploy per GitHub Actions auf GitHub Pages
+- [Stockfish.js](https://github.com/nmrugg/stockfish.js) – Schach-Engine als Web Worker (GNU GPL v3, unverändert
+  übernommen; Lizenz und Quellen in `public/stockfish/`)
 
 ```bash
 npm install
@@ -55,4 +64,4 @@ npm run build    # → dist/
 1. ~~Spielbares Online-Schach~~ ✓
 2. ~~Erwachende Figuren: Kampf-Animationen für jede Figur~~ ✓
 3. ~~Schachuhr, Zug zurücknehmen (mit Zustimmung), Chat & Emotes~~ ✓
-4. Gegen den Computer (Stockfish)
+4. ~~Gegen den Computer (Stockfish)~~ ✓

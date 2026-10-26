@@ -61,6 +61,10 @@ input.mono { font: 600 22px var(--mono); text-transform: uppercase; letter-spaci
 .seg { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .seg button { appearance: none; flex: 1 0 auto; border: 1px solid var(--line); background: rgba(255, 255, 255, .05); color: var(--cream); font: 500 14px var(--sans); padding: 8px 10px; border-radius: 9px; cursor: pointer; }
 .seg button.on { border-color: var(--gold); background: rgba(255, 196, 94, .16); color: var(--gold); }
+.seg.levels { display: grid; grid-template-columns: 1fr 1fr; }
+.seg.levels button { text-align: left; }
+.seg.levels b { display: inline-block; width: 18px; color: var(--muted); }
+.seg.levels button.on b { color: var(--gold); }
 .choice { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .choice .btn { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 6px; }
 .choice .glyph { font-size: 30px; }

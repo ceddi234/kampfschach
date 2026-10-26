@@ -14,9 +14,10 @@ const noOffers = () => ({ drawSent: false, drawReceived: false, rematchSent: fal
 const HOST_FLAG_GRACE = 2000;   // so lange wartet der Gastgeber auf die Zeitmeldung des Gasts, bevor er selbst abpfeift
 
 export class Session extends Emitter {
-  // mode: 'local' | 'host' | 'guest' · clock: { base, inc, times? } oder null (ohne Uhr)
+  // mode: 'local' | 'host' | 'guest' | 'cpu' (gegen den Computer; hostColor = Farbe des Menschen)
+  // clock: { base, inc, times? } oder null (ohne Uhr) · level: Stärke des Computers
   constructor({ mode, transport = null, code = null, myName = 'Spieler', opponentName = null,
-                hostColor = 'w', moves = [], result = null, game = 1, clock = null, timeLog = [], now }) {
+                hostColor = 'w', moves = [], result = null, game = 1, clock = null, timeLog = [], level = null, now }) {
     super();
     this.mode = mode;
     this.code = code;
@@ -30,7 +31,9 @@ export class Session extends Emitter {
     this.clock = this.#makeClock(clock);
     this.timeLog = [...timeLog];         // Restzeiten nach jedem Halbzug – fürs Zurücknehmen
     this.chat = [];                      // { me, text }
-    this.connection = mode === 'local' ? 'connected' : 'connecting';
+    this.level = level;
+    this.cpuAcceptsDraw = () => false;   // gegen den Computer: entscheidet main.js anhand der Engine-Bewertung
+    this.connection = this.online ? 'connecting' : 'connected';
     if (transport) {
       transport.onMessage((m) => this.#receive(m));
       transport.onStatus((s) => this.#status(s));
@@ -38,13 +41,28 @@ export class Session extends Emitter {
     this.#runClock();
   }
 
-  get online() { return this.mode !== 'local'; }
+  get online() { return this.mode === 'host' || this.mode === 'guest'; }
   get connected() { return this.connection === 'connected'; }
-  get myColor() { return this.mode === 'local' ? null : this.mode === 'host' ? this.hostColor : other(this.hostColor); }
+  get myColor() { return this.mode === 'local' ? null : this.mode === 'guest' ? other(this.hostColor) : this.hostColor; }
 
   // Gehört eine Figur dieser Farbe gerade "mir"? Lokal: immer die Seite am Zug.
-  isMine(color) { return this.online ? color === this.myColor : color === this.match.turn; }
+  isMine(color) { return this.mode === 'local' ? color === this.match.turn : color === this.myColor; }
   canMove() { return !this.match.over && this.connected && this.isMine(this.match.turn); }
+
+  // gegen den Computer: ist er dran?
+  engineTurn() { return this.mode === 'cpu' && !this.match.over && this.match.turn !== this.myColor; }
+
+  engineMove(lan) {
+    if (!this.engineTurn()) return null;
+    const ply = this.match.ply, mover = this.match.turn;
+    const m = this.match.move(fromLan(lan));
+    if (!m) return null;
+    this.#clearOffers();
+    this.#clockAfterMove(mover, ply);
+    this.emit('move', m);
+    this.#changed();
+    return m;
+  }
 
   move({ from, to, promotion }) {
     if (!this.canMove()) return null;
@@ -61,13 +79,19 @@ export class Session extends Emitter {
 
   resign() {
     if (this.match.over) return;
-    this.match.resign(this.online ? this.myColor : this.match.turn);
+    this.match.resign(this.mode === 'local' ? this.match.turn : this.myColor);
     this.#send({ t: 'resign', game: this.game });
     this.#changed();
   }
 
   offerDraw() {
     if (this.match.over || this.offers.drawSent) return;
+    if (this.mode === 'cpu') {
+      if (this.cpuAcceptsDraw()) this.match.agreeDraw();
+      else this.emit('declined', 'draw');
+      this.#changed();
+      return;
+    }
     if (!this.online) { this.match.agreeDraw(); this.#changed(); return; }
     this.offers.drawSent = true;
     this.#send({ t: 'draw-offer', game: this.game });
@@ -99,16 +123,19 @@ export class Session extends Emitter {
   }
 
   // ---------- Zug zurücknehmen ----------
-  // online: nur mit Zustimmung und nur, wenn darunter ein eigener Zug ist; lokal: sofort einen Halbzug
+  // online: nur mit Zustimmung und nur, wenn darunter ein eigener Zug ist; lokal: sofort einen Halbzug;
+  // gegen den Computer: sofort bis vor den eigenen letzten Zug
   canUndo() {
     if (this.match.over || this.match.ply === 0) return false;
-    if (!this.online) return true;
+    if (this.mode === 'local') return true;
+    if (this.mode === 'cpu') return this.#undoCount(this.myColor) > 0;
     return this.connected && !this.offers.undoSent && this.#undoCount(this.myColor) > 0;
   }
 
   requestUndo() {
     if (!this.canUndo()) return;
-    if (!this.online) return this.#applyUndo(1);
+    if (this.mode === 'local') return this.#applyUndo(1);
+    if (this.mode === 'cpu') return this.#applyUndo(this.#undoCount(this.myColor));
     this.offers.undoSent = true;
     this.#send({ t: 'undo-offer', ply: this.match.ply, game: this.game });
     this.#changed();
@@ -151,7 +178,7 @@ export class Session extends Emitter {
   snapshot() {
     return { mode: this.mode, code: this.code, hostColor: this.hostColor, game: this.game,
              moves: this.match.moves, result: this.match.result, names: this.names,
-             clock: this.clock?.config() ?? null, timeLog: this.timeLog };
+             clock: this.clock?.config() ?? null, timeLog: this.timeLog, level: this.level };
   }
 
   close() { this.transport?.close(); }

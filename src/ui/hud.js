@@ -3,6 +3,7 @@
 import { COLOR_NAME, RESULT_TEXT, other } from '../game/match.js';
 import { TIME_CONTROLS, formatTime } from '../game/clock.js';
 import { EMOTES } from '../net/protocol.js';
+import { LEVELS, levelById } from '../engine/engine.js';
 
 const GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
 const VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
@@ -42,6 +43,7 @@ export class Hud {
     this.unread = 0;
     this.gearOpen = false;
     this.timeChoice = 'none';
+    this.levelChoice = 3;
     this.fights = true;
     root.innerHTML = '<div id="screen"></div><div id="bubbles"></div><div id="overlay"></div><div id="toast" class="toast"></div>';
     this.el = { screen: root.querySelector('#screen'), bubbles: root.querySelector('#bubbles'), overlay: root.querySelector('#overlay'), toast: root.querySelector('#toast') };
@@ -69,7 +71,7 @@ export class Hud {
     const resume = saved ? `
       <button class="resume" data-act="resume">
         <b>Partie fortsetzen</b>
-        <span>${saved.mode === 'local' ? 'Am selben Gerät' : `Online gegen ${esc(saved.names?.opponent || 'deinen Gegner')}`} · ${Math.ceil(saved.moves.length / 2)} Züge</span>
+        <span>${{ local: 'Am selben Gerät', cpu: `Gegen den Computer (${levelById(saved.level).name})` }[saved.mode] ?? `Online gegen ${esc(saved.names?.opponent || 'deinen Gegner')}`} · ${Math.ceil(saved.moves.length / 2)} Züge</span>
       </button>` : '';
     this.#show('home', `
       <section class="card lobby">
@@ -79,8 +81,9 @@ export class Hud {
         ${resume}
         <button class="btn primary" data-act="create">Online-Spiel erstellen</button>
         <button class="btn" data-act="joinForm">Mit Code beitreten</button>
+        <button class="btn" data-act="cpuForm">Gegen den Computer</button>
         <button class="btn" data-act="localForm">Am selben Gerät spielen</button>
-        <p class="fine">Version 0.3 · Schachuhr, Zug zurücknehmen, Chat · beim Schlagen erwachen die Figuren</p>
+        <p class="fine">Version 0.4 · gegen den Computer (Stockfish) · Schachuhr, Chat · beim Schlagen erwachen die Figuren</p>
       </section>`);
   }
 
@@ -103,11 +106,33 @@ export class Hud {
         <span class="label">Deine Farbe</span>
         <div class="choice">
           <button class="btn" data-act="open" data-arg="w">${glyph('k', 'w')} Weiß</button>
-          <button class="btn" data-act="open" data-arg="random">🎲 Zufall</button>
+          <button class="btn" data-act="open" data-arg="random"><span class="glyph">🎲</span> Zufall</button>
           <button class="btn" data-act="open" data-arg="b">${glyph('k', 'b')} Schwarz</button>
         </div>
         <button class="btn ghost" data-act="home">Zurück</button>
       </section>`);
+  }
+
+  cpuSetup() {
+    this.#show('cpu', `
+      <section class="card lobby">
+        <h2>Gegen den Computer</h2>
+        <span class="label">Stärke</span>
+        <div class="seg levels">${LEVELS.map((l) => `<button class="${l.id === this.levelChoice ? 'on' : ''}" data-act="level" data-arg="${l.id}"><b>${l.id}</b> ${l.name}</button>`).join('')}</div>
+        ${this.#timePicker()}
+        <span class="label">Deine Farbe</span>
+        <div class="choice">
+          <button class="btn" data-act="startCpu" data-arg="w">${glyph('k', 'w')} Weiß</button>
+          <button class="btn" data-act="startCpu" data-arg="random"><span class="glyph">🎲</span> Zufall</button>
+          <button class="btn" data-act="startCpu" data-arg="b">${glyph('k', 'b')} Schwarz</button>
+        </div>
+        <button class="btn ghost" data-act="home">Zurück</button>
+      </section>`);
+  }
+
+  setLevel(id) {
+    this.levelChoice = id;
+    this.el.screen.querySelectorAll('[data-act="level"]').forEach((b) => b.classList.toggle('on', +b.dataset.arg === id));
   }
 
   localSetup() {
@@ -169,14 +194,14 @@ export class Hud {
     const keep = draft && { value: draft.value, focus: document.activeElement === draft };
 
     const m = s.match, over = m.over, mat = material(m.board());
-    const nameOf = (c) => !s.online ? COLOR_NAME[c] : c === s.myColor ? `${esc(s.names.me)} <i>(du)</i>` : esc(s.names.opponent || 'Gegner');
-    const left = s.online ? s.myColor : 'w', right = other(left);
+    const nameOf = (c) => s.mode === 'local' ? COLOR_NAME[c] : c === s.myColor ? `${esc(s.names.me)} <i>(du)</i>` : esc(s.names.opponent || 'Gegner');
+    const left = s.mode === 'local' ? 'w' : s.myColor, right = other(left);
     const player = (c, side) => {
       const adv = c === 'w' ? mat.diff : -mat.diff;
       return `
         <div class="player ${side} ${!over && m.turn === c ? 'active' : ''}">
           <div class="info">
-            <div class="who"><span class="dot ${c}"></span>${nameOf(c)}${s.online ? ` <small>${COLOR_NAME[c]}</small>` : ''}</div>
+            <div class="who"><span class="dot ${c}"></span>${nameOf(c)}${s.mode !== 'local' ? ` <small>${COLOR_NAME[c]}</small>` : ''}</div>
             <div class="caps">${mat.lost[other(c)].map((t) => glyph(t, other(c))).join('')}${adv > 0 ? `<em>+${adv}</em>` : ''}</div>
           </div>
           ${s.clock ? `<div class="clock" data-color="${c}"></div>` : ''}
@@ -186,7 +211,8 @@ export class Hud {
     let line;
     if (over) line = this.#resultLine(s);
     else if (m.inCheck()) line = '<b class="warn">Schach!</b>';
-    else if (!s.online) line = `${COLOR_NAME[m.turn]} ist am Zug`;
+    else if (s.mode === 'local') line = `${COLOR_NAME[m.turn]} ist am Zug`;
+    else if (s.mode === 'cpu') line = m.turn === s.myColor ? '<b>Du bist am Zug</b>' : 'Der Computer denkt nach …';
     else line = m.turn === s.myColor ? '<b>Du bist am Zug</b>' : `${esc(s.names.opponent || 'Gegner')} ist am Zug`;
 
     const conn = s.online && !s.connected
@@ -309,7 +335,7 @@ export class Hud {
   #resultLine(s) {
     const r = s.match.result;
     if (!r.winner) return `<b>Remis</b> · ${RESULT_TEXT[r.reason]}`;
-    const who = s.online ? (r.winner === s.myColor ? 'Du gewinnst' : `${esc(s.names.opponent || 'Gegner')} gewinnt`) : `${COLOR_NAME[r.winner]} gewinnt`;
+    const who = s.mode !== 'local' ? (r.winner === s.myColor ? 'Du gewinnst' : `${esc(s.names.opponent || 'Gegner')} gewinnt`) : `${COLOR_NAME[r.winner]} gewinnt`;
     return `<b>${who}</b> · ${RESULT_TEXT[r.reason]}`;
   }
 
@@ -353,11 +379,12 @@ export class Hud {
     const r = s.match.result;
     if (!r) return this.closeModal();
     let title = 'Remis';
-    if (r.winner) title = !s.online ? `${COLOR_NAME[r.winner]} gewinnt` : r.winner === s.myColor ? 'Gewonnen!' : 'Verloren';
+    if (r.winner) title = s.mode === 'local' ? `${COLOR_NAME[r.winner]} gewinnt` : r.winner === s.myColor ? 'Gewonnen!' : 'Verloren';
     let why = RESULT_TEXT[r.reason];
     const iWon = r.winner === s.myColor, opp = esc(s.names.opponent || 'Dein Gegner');
-    if (r.reason === 'resign') why = !s.online ? `${COLOR_NAME[other(r.winner)]} hat aufgegeben` : iWon ? `${opp} hat aufgegeben` : 'Du hast aufgegeben';
-    if (r.reason === 'timeout') why = !s.online ? `Die Zeit von ${COLOR_NAME[other(r.winner)]} ist abgelaufen` : iWon ? `Die Zeit von ${opp} ist abgelaufen` : 'Deine Zeit ist abgelaufen';
+    const local = s.mode === 'local';
+    if (r.reason === 'resign') why = local ? `${COLOR_NAME[other(r.winner)]} hat aufgegeben` : iWon ? `${opp} hat aufgegeben` : 'Du hast aufgegeben';
+    if (r.reason === 'timeout') why = local ? `Die Zeit von ${COLOR_NAME[other(r.winner)]} ist abgelaufen` : iWon ? `Die Zeit von ${opp} ist abgelaufen` : 'Deine Zeit ist abgelaufen';
     this.#modal('end', `
       <h2 class="big">${title}</h2>
       <p class="tag">${why}</p>

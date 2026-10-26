@@ -1,5 +1,5 @@
 // Name und laufende Partie im Browser merken (übersteht Neuladen und App-Neustart)
-const KEY = { name: 'ks.name', game: 'ks.game', fights: 'ks.fights', time: 'ks.time' };
+const KEY = { name: 'ks.name', game: 'ks.game', fights: 'ks.fights', time: 'ks.time', level: 'ks.level' };
 
 const get = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 const set = (k, v) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* privates Fenster */ } };
@@ -16,3 +16,6 @@ export const saveFights = (on) => set(KEY.fights, on ? '1' : '0');
 
 export const loadTime = () => get(KEY.time) || 'none';   // gewählte Bedenkzeit
 export const saveTime = (id) => set(KEY.time, id);
+
+export const loadLevel = () => +get(KEY.level) || 3;      // Stärke des Computers (1–6)
+export const saveLevel = (id) => set(KEY.level, String(id));

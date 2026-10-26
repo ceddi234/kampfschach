@@ -20,6 +20,9 @@ eigene Figuren, eigene Animationen, eigener Name. Antworten/Texte auf Deutsch.
 - Kämpfe: `rigs.js` (6 erwachte Figuren als Gelenk-Rigs, +x = Richtung Gegner), `clips.js` (Schlüsselposen: Angriff mit
   `hit`/`reach`/`launch`, Abwehr, Niederlage), `fx.js` (Funken, Wirbel, Geschosse, Hieb, Druckwelle, Zerspringen),
   `duel.js` (Ablauf). Alles läuft über `board.tween` → `board.skip()` spult jeden Kampf sauber ans Ende
+- `src/engine/engine.js` – Stockfish 18 Lite (Single-Thread, `public/stockfish/`, GPLv3) als Web Worker über UCI;
+  `LEVELS` 1–6 = Skill Level + Suchtiefe/-zeit. Session-Modus `cpu` (`hostColor` = Farbe des Menschen, `engineMove()`),
+  main.js lässt die Engine rechnen und zieht erst, wenn die Animationen fertig sind (`maybeEngineMove`)
 - `src/ui/hud.js` + `style.css` – Menü, Spielanzeige, Dialoge (Buttons über `data-act`); `src/main.js` verdrahtet alles
 - `tools/icon.html` + `tools/save-server.js` – App-Icon aus der echten Springer-Figur rendern
 - `tools/duel.html` – Kampf-Labor: `?a=n&v=p&ac=w` live, mit `&sheet` Kontaktbogen (16 Bilder über 8 s) per
@@ -28,7 +31,7 @@ eigene Figuren, eigene Animationen, eigener Name. Antworten/Texte auf Deutsch.
 
 ## Arbeiten
 
-- `npm test` (vitest, 35 Tests), `npm run build`; Dev-Server über launch.json „kampfschach“ (Port 5180)
+- `npm test` (vitest, 39 Tests), `npm run build`; Dev-Server über launch.json „kampfschach“ (Port 5180)
 - Im Dev-Modus gibt es `window.__ks` (board, hud, session, state, `screen(feld)`) für Klick-Tests im Browser
 - Browser-Pane versteckt → `requestAnimationFrame` läuft nicht, Animationen hängen; in Tests `__ks.board.finishAll()`
   (einen Tick NACH dem Zug aufrufen). Zwei Test-Tabs teilen sich localStorage – Namen/gespeicherte Partie vermischen sich.
@@ -38,4 +41,4 @@ eigene Figuren, eigene Animationen, eigener Name. Antworten/Texte auf Deutsch.
 1. ✓ Spielbares Online-Schach (Raum-Code, Wiederverbinden, Revanche, Remis/Aufgabe, Handy-Layout)
 2. ✓ Erwachende Figuren: Kämpfe für alle 6 Angreifer × 5 Opfer, Überspringen per Klick, Schalter ⚔, König kippt bei Matt
 3. ✓ Schachuhr, Zug zurücknehmen mit Zustimmung, Chat/Emotes (v0.3)
-4. Gegen den Computer (Stockfish WASM)
+4. ✓ Gegen den Computer (Stockfish, 6 Stufen) (v0.4)
