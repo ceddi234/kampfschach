@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Kampf-Labor</title>
+<style>
+  body { margin: 0; background: #111; color: #eee; font: 14px system-ui; }
+  #stage { width: 960px; height: 600px; position: relative; }
+  #bar { padding: 8px; display: flex; gap: 8px; align-items: center; }
+  select, button { font: inherit; }
+</style>
+</head>
+<body>
+<div id="bar">
+  Angreifer <select id="a"></select> <select id="ac"><option value="w">weiß</option><option value="b">schwarz</option></select>
+  schlägt <select id="v"></select>
+  <button id="go">Kampf abspielen</button>
+</div>
+<div id="stage"></div>
+<script type="module">
+// Kampf-Labor: spielt einen einzelnen Schlagzug ab.
+//   ?a=n&v=p&ac=w        Angreifer, Opfer, Farbe des Angreifers
+//   &sheet               statt live: Einzelbilder im festen Zeittakt → Kontaktbogen an tools/save-server.js
+//                        (node tools/save-server.js tools/out) → tools/out/duel-<a>-<v>.png
+import { Board3D } from '../src/render/board3d.js';
+import { ATTACK } from '../src/render/clips.js';
+
+const NAMES = { p: 'Bauer', n: 'Springer', b: 'Läufer', r: 'Turm', q: 'Dame', k: 'König' };
+// Startfeld je Angreifer, Opfer steht immer auf e5 (für Schwarz gespiegelt)
+const FROM = { p: 'd4', n: 'd3', b: 'b2', r: 'e1', q: 'h2', k: 'e4' };
+const mirror = (sq) => sq[0] + (9 - +sq[1]);
+
+const qs = new URLSearchParams(location.search);
+const a = qs.get('a') || 'n', v = qs.get('v') || 'p', ac = qs.get('ac') || 'w', vc = ac === 'w' ? 'b' : 'w';
+for (const [id, val, keys] of [['a', a, 'pnbrqk'], ['v', v, 'pnbrq']]) {
+  const sel = document.getElementById(id);
+  for (const t of keys) sel.add(new Option(NAMES[t], t, false, t === val));
+}
+document.getElementById('ac').value = ac;
+document.getElementById('go').onclick = () => {
+  const p = new URLSearchParams({ a: document.getElementById('a').value, v: document.getElementById('v').value, ac: document.getElementById('ac').value });
+  location.search = p.toString();
+};
+
+const board = new Board3D(document.getElementById('stage'), { onSquare() {}, canSelect: () => false });
+const from = ac === 'w' ? FROM[a] : mirror(FROM[a]), to = ac === 'w' ? 'e5' : 'e4';
+const cell = (sq, type, color) => ({ square: sq, type, color });
+const rows = Array.from({ length: 8 }, () => Array(8).fill(null));
+const put = (p) => { rows[8 - +p.square[1]]['abcdefgh'.indexOf(p.square[0])] = p; };
+// ein paar Zuschauer, damit es nach Brett aussieht
+[cell(from, a, ac), cell(to, v, vc), cell('a1', 'r', 'w'), cell('g1', 'k', 'w'), cell('b7', 'p', 'b'), cell('g8', 'k', 'b'), cell('h7', 'p', 'b'), cell('c2', 'p', 'w')]
+  .filter((p, i, all) => all.findIndex((x) => x.square === p.square) === i).forEach(put);
+board.sync(rows);
+board.setOrientation(ac, false);
+const move = { from, to, piece: a, color: ac, captured: v, flags: 'c' };
+
+if (!qs.has('sheet')) {
+  setTimeout(() => board.animateMove(move), 600);
+} else {
+  board.manual = true;
+  board.advance(0);
+  const done = board.animateMove(move);
+  let finished = false;
+  done.then(() => { finished = true; });
+  // Zeitpunkte: Heranrücken, Erwachen, Angriff (um den Treffer herum), Zerspringen, zurück zur Figur
+  const atk = ATTACK[a], step = 1 / 60;
+  const COLS = 4, ROWS = 4, W = 480, H = 300;
+  const sheet = document.createElement('canvas');
+  sheet.width = COLS * W; sheet.height = ROWS * H;
+  const g = sheet.getContext('2d');
+  g.font = '600 18px system-ui'; g.fillStyle = '#fff';
+  const total = 8;
+  const shots = Array.from({ length: COLS * ROWS }, (_, i) => (i + 1) * (total / (COLS * ROWS)));
+  let t = 0, i = 0;
+  while (i < shots.length) {
+    board.advance(step);
+    for (let m = 0; m < 12; m++) await Promise.resolve();   // async-Ketten des Kampfs weiterlaufen lassen (kein setTimeout: im Hintergrund gedrosselt)
+    t += step;
+    if (t >= shots[i]) {
+      const x = (i % COLS) * W, y = Math.floor(i / COLS) * H;
+      g.drawImage(board.renderer.domElement, x, y, W, H);
+      g.fillText(`${t.toFixed(2)} s`, x + 10, y + 24);
+      i++;
+    }
+  }
+  g.fillText(`${NAMES[a]} (${ac}) schlägt ${NAMES[v]} · Treffer bei ${atk.hit}s nach Kampfbeginn · fertig: ${finished}`, 10, sheet.height - 12);
+  const blob = await new Promise((r) => sheet.toBlob(r, 'image/png'));
+  await fetch(`http://localhost:4632/save/duel-${a}-${v}.png`, { method: 'POST', mode: 'no-cors', body: new Blob([blob], { type: 'text/plain' }) });
+  document.title = 'gespeichert';
+}
+</script>
+</body>
+</html>

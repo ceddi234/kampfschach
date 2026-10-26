@@ -124,6 +124,6 @@ input.mono { font: 600 22px var(--mono); text-transform: uppercase; letter-spaci
   .side { display: none; }
   .side.open { display: flex; left: 12px; right: 12px; width: auto; top: auto; height: 42vh; bottom: calc(124px + var(--safe-bottom)); }
   .actions { width: calc(100vw - 24px); justify-content: space-between; gap: 4px; padding: 6px; }
-  .actions .btn { flex: 1; padding: 10px 4px; font-size: 13px; }
+  .actions .btn { flex: 1; padding: 10px 2px; font-size: 12.5px; }
   .only-small { display: inline-block; }
 }

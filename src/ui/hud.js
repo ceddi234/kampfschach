@@ -71,7 +71,7 @@ export class Hud {
         <button class="btn primary" data-act="create">Online-Spiel erstellen</button>
         <button class="btn" data-act="joinForm">Mit Code beitreten</button>
         <button class="btn" data-act="local">Am selben Gerät spielen</button>
-        <p class="fine">Version 0.1 · die Figuren-Kämpfe kommen in einem der nächsten Schritte</p>
+        <p class="fine">Version 0.2 · beim Schlagen erwachen die Figuren – ein Klick aufs Brett überspringt den Kampf</p>
       </section>`);
   }
 
@@ -162,7 +162,7 @@ export class Hud {
     const actions = over
       ? `<button class="btn primary" data-act="rematch" ${s.offers.rematchSent ? 'disabled' : ''}>${s.offers.rematchSent ? 'Revanche angefragt …' : 'Revanche'}</button>
          <button class="btn" data-act="result">Ergebnis</button>`
-      : `<button class="btn" data-act="draw" ${s.offers.drawSent || (s.online && !s.connected) ? 'disabled' : ''}>${s.offers.drawSent ? 'Remis angeboten …' : 'Remis anbieten'}</button>
+      : `<button class="btn" data-act="draw" title="Remis anbieten" ${s.offers.drawSent || (s.online && !s.connected) ? 'disabled' : ''}>${s.offers.drawSent ? 'Remis …' : 'Remis'}</button>
          <button class="btn" data-act="resign">Aufgeben</button>`;
 
     this.el.screen.querySelector('#hud').innerHTML = `
@@ -176,6 +176,7 @@ export class Hud {
       </aside>
       <nav class="actions">
         ${actions}
+        <button class="btn" data-act="fights" title="Kampf-Animationen beim Schlagen an/aus">⚔︎ ${this.fights ? 'an' : 'aus'}</button>
         <button class="btn" data-act="view" title="Blick zurücksetzen">Ansicht</button>
         <button class="btn only-small" data-act="moves">Züge</button>
         <button class="btn" data-act="menu">Menü</button>

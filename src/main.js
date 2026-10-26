@@ -15,6 +15,7 @@ let gen = 0;                   // zählt hoch, wenn der Stand komplett neu geset
 let endShown = false;
 
 const board = new Board3D(document.getElementById('stage'), { onSquare: clickSquare, canSelect: selectable });
+board.fights = store.loadFights();
 const hud = new Hud(document.getElementById('ui'), {
   name: (v) => store.saveName(v),
   local: () => { store.clearGame(); attach(new Session({ mode: 'local' })); enterGame(); },
@@ -39,9 +40,16 @@ const hud = new Hud(document.getElementById('ui'), {
   result: () => hud.showEnd(session),
   closeModal: () => hud.closeModal(),
   view: () => board.resetView(),
+  fights: () => {
+    board.fights = hud.fights = !board.fights;
+    store.saveFights(board.fights);
+    hud.toast(board.fights ? 'Kämpfe an – ein Klick aufs Brett überspringt sie' : 'Kämpfe aus');
+    if (session) hud.update(session);
+  },
   moves: () => hud.toggleSide(),
   menu: () => leave(),
 });
+hud.fights = board.fights;
 
 const myName = () => store.loadName().trim() || 'Spieler';
 const linkFor = (code) => `${location.origin}${location.pathname}#${code}`;
@@ -67,11 +75,10 @@ function attach(s) {
     if (s !== session) return;
     gen++;
     pending = 0;
-    board.finishAll();
     selected = null;
     endShown = false;
     hud.closeModal();
-    board.sync(s.match.board());
+    setBoard(() => s.match.board());
     if (hud.screen !== 'game') enterGame();
     else orient();
   });
@@ -148,9 +155,8 @@ function goHome() {
   pending = 0;
   selected = null;
   hud.closeModal();
-  board.finishAll();
   board.setMarks();
-  board.sync(new Match().board());
+  setBoard(() => new Match().board());
   board.setInset(0);
   board.setIdle(true);
   const saved = store.loadGame();
@@ -159,6 +165,14 @@ function goHome() {
 
 function copyLink() {
   navigator.clipboard?.writeText(linkFor(session.code)).then(() => hud.toast('Link kopiert'), () => hud.toast('Kopieren ging nicht – Link markieren und kopieren'));
+}
+
+// Stand hart setzen: laufende Kämpfe spulen durch, danach noch einmal abgleichen
+function setBoard(state) {
+  const g = gen;
+  board.skip();
+  board.sync(state());
+  board.whenIdle().then(() => g === gen && board.sync(state()));
 }
 
 // ---------- Züge ----------
@@ -178,6 +192,7 @@ function afterMoves() {
   const m = session.match;
   marks();
   if (!m.over && m.inCheck()) hud.toast('Schach!');
+  if (m.result?.reason === 'checkmate' && !endShown) board.topple(m.kingSquare(m.turn));   // der König fällt
   checkEnd();
 }
 
@@ -185,7 +200,7 @@ function afterMoves() {
 function checkEnd() {
   if (!session?.match.over || endShown || pending) return;
   endShown = true;
-  setTimeout(() => session?.match.over && hud.showEnd(session), 500);
+  setTimeout(() => session?.match.over && hud.showEnd(session), session.match.result.reason === 'checkmate' ? 1400 : 500);
 }
 
 function marks() {

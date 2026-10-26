@@ -1,4 +1,4 @@
-// 3D-Brett: Szene, Kamera, Figuren, Zug-Animationen, Markierungen und Klick-Erkennung.
+// 3D-Brett: Szene, Kamera, Figuren, Zug-Animationen, Kämpfe, Markierungen und Klick-Erkennung.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -7,32 +7,20 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { MAT, figurine } from './pieces.js';
+import { FX } from './fx.js';
+import { duel } from './duel.js';
+import { sample } from './clips.js';
+import { V3, hdr, ease, easeBack } from './util.js';
+import { canvasTexture, radial } from './textures.js';
 
 const FILES = 'abcdefgh';
-export const squarePos = (sq, y = 0) => new THREE.Vector3(FILES.indexOf(sq[0]) - 3.5, y, 4.5 - +sq[1]);
+export const squarePos = (sq, y = 0) => V3(FILES.indexOf(sq[0]) - 3.5, y, 4.5 - +sq[1]);
 const squareAt = (x, z) => {
   const f = Math.floor(x + 4), r = Math.floor(4 - z) + 1;
   return f >= 0 && f < 8 && r >= 1 && r <= 8 ? FILES[f] + r : null;
 };
-const hdr = (hex, k) => new THREE.Color(hex).multiplyScalar(k);
-const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
-const easeBack = (k) => 1 + 2.7 * Math.pow(k - 1, 3) + 1.7 * Math.pow(k - 1, 2);
 const POLAR = 0.83;   // Kamera-Neigung (Radiant von der Senkrechten); im Hochformat steiler
-
-function canvasTexture(size, draw) {
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  draw(c.getContext('2d'), size);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-const radial = (stops) => canvasTexture(64, (g, s) => {
-  const gr = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  stops.forEach(([o, c]) => gr.addColorStop(o, c));
-  g.fillStyle = gr; g.fillRect(0, 0, s, s);
-});
-const DOT = radial([[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(255,255,255,.7)'], [1, 'rgba(255,255,255,0)']]);
+const bounce = (k) => (k < 0.7 ? Math.pow(k / 0.7, 2) : 1 - Math.sin((k - 0.7) / 0.3 * Math.PI) * 0.08);
 
 // Markierungen: flach aufs Brett gelegt, teils über 1 hell → leuchten durch den Bloom
 const flat = (geo) => geo.rotateX(-Math.PI / 2);
@@ -53,15 +41,23 @@ export class Board3D {
     this.canSelect = canSelect;
     this.pieces = new Map();      // Feld → Figur
     this.tweens = [];
+    this.time = 0;                // eigene Uhr in Sekunden – läuft im Bild-Takt, im Labor von Hand
+    this.manual = false;
+    this.fast = false;            // überspringen: jeder Tween springt sofort ans Ende
+    this.fights = true;           // Schlagzüge als Kampf zeigen
+    this.busy = 0;                // laufende Kämpfe
+    this.idle = [];               // wartet auf das Ende aller Kämpfe (whenIdle)
+    this.cinematic = false;
     this.lifted = null;
     this.ray = new THREE.Raycaster();
     this.ndc = new THREE.Vector2();
-    this.plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    this.plane = new THREE.Plane(V3(0, 1, 0), 0);
     this.#setupRenderer();
     this.#setupScene();
     this.#buildBoard();
     this.#setupCamera();
     this.#setupPointer();
+    this.fx = new FX(this);
     new ResizeObserver(() => this.#resize()).observe(container);
     this.#resize();
     this.renderer.setAnimationLoop((t) => this.#frame(t));
@@ -81,11 +77,12 @@ export class Board3D {
       g.position.copy(squarePos(sq));
       g.scale.setScalar(1);
       g.rotation.set(0, g.userData.yaw, 0);
+      g.visible = true;
     }
     this.lifted = null;
   }
 
-  // einen chess.js-Zug animieren (inkl. Schlagen, Rochade, en passant, Umwandlung)
+  // einen chess.js-Zug animieren (inkl. Kampf beim Schlagen, Rochade, en passant, Umwandlung)
   animateMove(m) {
     this.#drop();
     const g = this.pieces.get(m.from);
@@ -95,8 +92,17 @@ export class Board3D {
     this.pieces.delete(m.from);
     if (victim) this.pieces.delete(capSq);
     this.#move(g, m.to);
+    const promote = () => m.promotion && this.#promote(m.to, m.promotion, m.color);
+    if (victim && this.fights) {
+      this.busy++;
+      return duel(this, m, g, victim, squarePos(m.to)).finally(() => {
+        if (--this.busy) return;
+        this.fast = false;
+        this.idle.splice(0).forEach((resolve) => resolve());
+      }).then(promote);
+    }
     const jump = m.piece === 'n', dur = this.#duration(m.from, m.to, jump);
-    const jobs = [this.#slide(g, m.from, m.to, jump, dur)];
+    const jobs = [this.slideTo(g, squarePos(m.from), squarePos(m.to), jump, dur)];
     if (victim) jobs.push(this.#sink(victim, dur * 0.7));
     if (m.flags.includes('k') || m.flags.includes('q')) {
       const [rf, rt] = m.flags.includes('k') ? ['h', 'f'] : ['a', 'd'], from = rf + m.from[1], to = rt + m.from[1];
@@ -104,10 +110,25 @@ export class Board3D {
       if (rook) {
         this.pieces.delete(from);
         this.#move(rook, to);
-        jobs.push(this.#slide(rook, from, to, false, this.#duration(from, to, false), 0.12));
+        jobs.push(this.slideTo(rook, squarePos(from), squarePos(to), false, this.#duration(from, to, false), 0.12));
       }
     }
-    return Promise.all(jobs).then(() => m.promotion && this.#promote(m.to, m.promotion, m.color));
+    return Promise.all(jobs).then(promote);
+  }
+
+  // Schachmatt: der König kippt um
+  topple(sq) {
+    const g = this.pieces.get(sq);
+    if (!g) return Promise.resolve();
+    const yaw = g.rotation.y, base = g.position.clone(), r = 0.34, tilt = 1.42;
+    this.fx.burst(base.clone().add(V3(0, 0.15, 0)), g.userData.color, { n: 30, speed: 0.7, delay: 0.75 });
+    return this.tween(1.0, (k) => {
+      const a = tilt * bounce(k);
+      // um die Sockelkante drehen, damit die Figur nicht ins Brett sinkt
+      const off = V3(r - r * Math.cos(a), r * Math.sin(a), 0).applyAxisAngle(V3(0, 1, 0), yaw);
+      g.rotation.set(0, yaw, -a);
+      g.position.copy(base).add(off);
+    });
   }
 
   // alle laufenden Animationen sofort beenden (z. B. wenn ein neuer Stand vom Gastgeber kommt)
@@ -115,6 +136,17 @@ export class Board3D {
     const running = this.tweens;
     this.tweens = [];
     for (const t of running) { t.fn(1); t.resolve(); }
+  }
+
+  // Kampf überspringen: laufende Kämpfe spulen sofort bis zum Ende durch
+  skip() {
+    this.fast = this.busy > 0;
+    this.finishAll();
+  }
+
+  // erfüllt sich, sobald kein Kampf mehr läuft
+  whenIdle() {
+    return this.busy ? new Promise((resolve) => this.idle.push(resolve)) : Promise.resolve();
   }
 
   setMarks({ selected = null, targets = [], last = null, check = null } = {}) {
@@ -138,17 +170,19 @@ export class Board3D {
   }
 
   resetView(animate = true) {
+    // kaputte Kamera (z. B. NaN) nicht weiterschleppen, sondern neu ansetzen
+    if (!Number.isFinite(this.camera.position.length()) || this.camera.position.distanceTo(this.controls.target) < 0.01) this.camera.position.set(0, 8, 9);
     const target = this.viewColor === 'b' ? Math.PI : 0;
     const from = new THREE.Spherical().setFromVector3(this.camera.position.clone().sub(this.controls.target));
-    let dTheta = ((target - from.theta) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI;   // kürzester Weg
-    const to = { theta: from.theta + dTheta, phi: this.polar, radius: this.distance };
+    const dTheta = ((target - from.theta) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI;   // kürzester Weg
+    const to = { phi: this.polar, radius: this.distance };
     const apply = (k) => {
       const e = ease(k);
       const s = new THREE.Spherical(from.radius + (to.radius - from.radius) * e, from.phi + (to.phi - from.phi) * e, from.theta + dTheta * e);
       this.camera.position.setFromSpherical(s).add(this.controls.target);
       this.camera.lookAt(this.controls.target);
     };
-    if (animate) return this.#tween(0.9, apply);
+    if (animate) return this.tween(0.9, apply);
     apply(1);
     return Promise.resolve();
   }
@@ -160,6 +194,76 @@ export class Board3D {
   setInset(right) {
     this.inset = right;
     this.#resize();
+  }
+
+  // ---------- Bausteine für Kämpfe und Effekte ----------
+  tween(dur, fn, delay = 0) {
+    if (this.fast) { fn(1); return Promise.resolve(); }
+    return new Promise((resolve) => this.tweens.push({ start: this.time + delay, dur: Math.max(dur, 1e-4), fn, resolve }));
+  }
+
+  at(delay, fn) { return this.tween(1e-4, (k) => k >= 1 && fn(), delay); }
+
+  // Clip abspielen (dur > clip.dur hält die letzte Pose)
+  play(rig, clip, dur = clip.dur) { return this.tween(dur, (k) => rig.pose(sample(clip, k * dur))); }
+
+  slideTo(g, a, b, jump, dur = jump ? 0.6 : 0.25 + a.distanceTo(b) * 0.07, delay = 0) {
+    const h = jump ? 0.9 : Math.min(0.12 + a.distanceTo(b) * 0.03, 0.3);
+    return this.tween(dur, (k) => {
+      const e = ease(k);
+      g.position.lerpVectors(a, b, e);
+      g.position.y = Math.sin(Math.PI * e) * h;
+    }, delay);
+  }
+
+  // Kamerafahrt seitlich an den Kampf heran …
+  cinemaIn(a, b) {
+    this.saved = this.camera.position.clone();
+    const mid = a.clone().add(b).multiplyScalar(0.5).setY(0.45);
+    const dir = b.clone().sub(a).setY(0).normalize(), side = V3(-dir.z, 0, dir.x);
+    if (side.dot(this.camera.position.clone().sub(mid)) < 0) side.negate();   // auf der Seite bleiben, von der man schaut
+    const span = a.distanceTo(b);
+    const pos = mid.clone().addScaledVector(side, 2.6 + span * 0.7).addScaledVector(dir, -0.5).setY(1.6 + span * 0.25);
+    this.cinematic = true;
+    this.controls.enabled = false;
+    this.fill.position.copy(pos).lerp(mid, 0.25).add(V3(0, 0.6, 0));
+    this.tween(0.7, (k) => { this.fill.intensity = 4.5 * k; });
+    return this.#camTo(pos, mid, 0.7);
+  }
+
+  // … und zurück zur Spielansicht
+  async cinemaOut() {
+    if (!this.saved) return;
+    this.tween(0.7, (k) => { this.fill.intensity = 4.5 * (1 - k); });
+    await this.#camTo(this.saved, this.controls.target.clone(), 0.7);
+    this.saved = this.look = null;
+    this.cinematic = false;
+    this.controls.enabled = true;
+    this.controls.update();
+  }
+
+  #camTo(pos, look, dur) {
+    const p0 = this.camera.position.clone(), l0 = this.look ? this.look.clone() : this.controls.target.clone();
+    return this.tween(dur, (k) => {
+      const e = ease(k);
+      this.camera.position.lerpVectors(p0, pos, e);
+      this.look = l0.clone().lerp(look, e);
+      this.camera.lookAt(this.look);
+    });
+  }
+
+  // Uhr weiterdrehen, Tweens ausführen, Bild rendern (im Labor von Hand aufgerufen)
+  advance(dt) {
+    this.time += dt;
+    for (const t of [...this.tweens]) {
+      if (this.time < t.start) continue;
+      const k = Math.min(1, (this.time - t.start) / t.dur);
+      t.fn(k);
+      if (k >= 1) { this.tweens.splice(this.tweens.indexOf(t), 1); t.resolve(); }
+    }
+    if (this.lifted) this.lifted.position.y = 0.12 + Math.sin(this.time * 3.8) * 0.03;
+    if (!this.cinematic) this.controls.update();
+    this.composer.render();
   }
 
   // ---------- Aufbau ----------
@@ -192,6 +296,9 @@ export class Board3D {
     const rim = new THREE.DirectionalLight(0x8fa6ff, 1.0);
     rim.position.set(5, 4, -6);
     s.add(rim);
+    // Aufhelllicht für die Kamerafahrt (sonst verschwinden schwarze Figuren im Dunkeln); ist immer da, nur meist aus
+    this.fill = new THREE.PointLight(0xfff1dc, 0, 12, 1);
+    s.add(this.fill);
     this.root = new THREE.Group();      // nur Figuren (für die Klick-Erkennung)
     this.marks = new THREE.Group();
     s.add(this.root, this.marks);
@@ -240,7 +347,9 @@ export class Board3D {
       minPolarAngle: 0.2, maxPolarAngle: 1.22, minDistance: 6, maxDistance: 24,
     });
     this.viewColor = 'w';
-    this.camera.position.set(0, 1, 1);
+    this.distance = 12.4;      // Startwerte, falls das Fenster beim Laden noch keine Größe hat
+    this.polar = POLAR;
+    this.camera.position.set(0, 8, 9);
     this.composer = new EffectComposer(this.renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.45, 1.3));
@@ -271,7 +380,7 @@ export class Board3D {
     else this.camera.clearViewOffset();
     this.camera.updateProjectionMatrix();
     this.controls.maxDistance = Math.max(24, this.distance * 1.3);
-    this.resetView(false);
+    if (!this.cinematic) this.resetView(false);
   }
 
   #setupPointer() {
@@ -283,13 +392,14 @@ export class Board3D {
       const tap = Math.hypot(e.clientX - down.x, e.clientY - down.y) < 8 && performance.now() - down.t < 600;
       down = null;
       if (!tap) return;
+      if (this.busy) return this.skip();   // Tippen während eines Kampfs überspringt ihn
       const sq = this.#pick(e);
       if (sq) this.onSquare(sq);
     });
     el.addEventListener('pointermove', (e) => {
       if (e.pointerType !== 'mouse' || e.buttons) return;
-      const sq = this.#pick(e);
-      el.style.cursor = sq && this.canSelect(sq) ? 'pointer' : '';
+      const sq = this.busy ? null : this.#pick(e);
+      el.style.cursor = this.busy ? 'pointer' : sq && this.canSelect(sq) ? 'pointer' : '';
     });
   }
 
@@ -303,25 +413,15 @@ export class Board3D {
       while (o && o.parent !== this.root) o = o.parent;
       if (o && this.pieces.get(o.userData.square) === o) return o.userData.square;
     }
-    const p = this.ray.ray.intersectPlane(this.plane, new THREE.Vector3());
+    const p = this.ray.ray.intersectPlane(this.plane, V3());
     return p ? squareAt(p.x, p.z) : null;
   }
 
   // ---------- Animationen ----------
   #frame(now) {
-    for (const t of [...this.tweens]) {
-      if (now < t.start) continue;
-      const k = Math.min(1, (now - t.start) / t.dur);
-      t.fn(k);
-      if (k >= 1) { this.tweens.splice(this.tweens.indexOf(t), 1); t.resolve(); }
-    }
-    if (this.lifted) this.lifted.position.y = 0.12 + Math.sin(now / 260) * 0.03;
-    this.controls.update();
-    this.composer.render();
-  }
-
-  #tween(dur, fn, delay = 0) {
-    return new Promise((resolve) => this.tweens.push({ start: performance.now() + delay * 1000, dur: dur * 1000, fn, resolve }));
+    const dt = this.lastFrame === undefined ? 0 : Math.min(0.1, (now - this.lastFrame) / 1000);
+    this.lastFrame = now;
+    if (!this.manual) this.advance(dt);
   }
 
   #place(g, sq) {
@@ -341,43 +441,14 @@ export class Board3D {
 
   #duration(from, to, jump) { return jump ? 0.6 : 0.25 + squarePos(from).distanceTo(squarePos(to)) * 0.07; }
 
-  #slide(g, from, to, jump, dur, delay = 0) {
-    const a = squarePos(from), b = squarePos(to), h = jump ? 0.9 : Math.min(0.12 + a.distanceTo(b) * 0.03, 0.3);
-    return this.#tween(dur, (k) => {
-      const e = ease(k);
-      g.position.lerpVectors(a, b, e);
-      g.position.y = Math.sin(Math.PI * e) * h;
-    }, delay);
-  }
-
-  // geschlagene Figur versinkt drehend im Brett, Funken stieben (die echten Kämpfe kommen später)
+  // ohne Kampf: geschlagene Figur versinkt drehend im Brett, Funken stieben
   #sink(g, delay) {
     const yaw = g.rotation.y;
-    this.#burst(g.position.clone().setY(0.45), g.userData.color, delay);
-    return this.#tween(0.5, (k) => {
+    this.fx.burst(g.position.clone().setY(0.45), g.userData.color, { delay });
+    return this.tween(0.5, (k) => {
       g.position.y = -k * k * 1.1;
       g.rotation.y = yaw + k * 4;
       if (k >= 1) this.root.remove(g);
-    }, delay);
-  }
-
-  #burst(center, color, delay) {
-    const n = 40, dirs = [];
-    let pts = null;
-    return this.#tween(0.7, (k) => {
-      if (!pts) {
-        for (let i = 0; i < n; i++) dirs.push(new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.9, Math.random() - 0.5).normalize().multiplyScalar(0.4 + Math.random() * 0.7));
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
-        pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: hdr(color === 'w' ? 0xffc45e : 0xb35cff, 3), size: 0.07, map: DOT,
-                                                              transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-        this.scene.add(pts);
-      }
-      const arr = pts.geometry.attributes.position.array;
-      dirs.forEach((d, i) => arr.set([center.x + d.x * k, center.y + d.y * k - 0.5 * k * k, center.z + d.z * k], i * 3));
-      pts.geometry.attributes.position.needsUpdate = true;
-      pts.material.opacity = 1 - k;
-      if (k >= 1) { this.scene.remove(pts); pts.geometry.dispose(); pts.material.dispose(); }
     }, delay);
   }
 
@@ -386,7 +457,7 @@ export class Board3D {
     if (old) this.root.remove(old);
     const g = figurine(type, color);
     this.#place(g, sq);
-    this.#burst(squarePos(sq, 0.5), color, 0);
-    return this.#tween(0.55, (k) => g.scale.setScalar(0.15 + 0.85 * easeBack(k)));
+    this.fx.burst(squarePos(sq, 0.5), color);
+    return this.tween(0.55, (k) => g.scale.setScalar(0.15 + 0.85 * easeBack(k)));
   }
 }

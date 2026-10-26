@@ -1,5 +1,5 @@
 // Name und laufende Partie im Browser merken (übersteht Neuladen und App-Neustart)
-const KEY = { name: 'ks.name', game: 'ks.game' };
+const KEY = { name: 'ks.name', game: 'ks.game', fights: 'ks.fights' };
 
 const get = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 const set = (k, v) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* privates Fenster */ } };
@@ -10,3 +10,6 @@ export const saveName = (name) => set(KEY.name, name.trim().slice(0, 24));
 export const loadGame = () => { try { return JSON.parse(get(KEY.game)); } catch { return null; } };
 export const saveGame = (snapshot) => set(KEY.game, JSON.stringify(snapshot));
 export const clearGame = () => set(KEY.game, null);
+
+export const loadFights = () => get(KEY.fights) !== '0';   // Standard: Kämpfe an
+export const saveFights = (on) => set(KEY.fights, on ? '1' : '0');
