@@ -4,7 +4,7 @@
 // Spieler denselben Kampf. Alles läuft über die Tweens des Bretts und lässt sich daher jederzeit überspringen.
 import { makeRig } from './rigs.js';
 import { ATTACK, BLOCK, BLOCK_KIND, DEFEAT, GUARD, RANGED, sample } from './clips.js';
-import { V3, ease, easeBack } from './util.js';
+import { ease, easeBack } from './util.js';
 
 const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a));   // Winkel auf −π…π
 const BULK = { n: 0.25, r: 0.1 };                            // große Figuren brauchen etwas mehr Abstand
@@ -23,18 +23,13 @@ export const exchangesFor = (m) => 1 + (hash(`${m.before ?? ''}${m.from}${m.to}`
 // Geräusche und Effekte des Angreifers, zeitlich passend zum Clip; impact() = wo es einschlägt
 const CHOREO = {
   p: (b, P, Q, T) => b.sfx('whoosh', T.hit - 0.22),
-  n: (b, P, Q, T, side, impact, blocked) => {
-    b.sfx('whoosh', T.hit * 0.45);
-    b.at(T.hit, () => {
-      b.fx.shockwave(P.world('hoof'), side, { size: blocked ? 0.9 : 1.3 });
-      b.sfx('stomp');
-    });
+  n: (b, P, Q, T) => {
+    for (const f of [0.45, 0.6, 0.75, 0.9]) b.sfx('hoof', T.hit * f);   // Anritt
+    b.sfx('whoosh', T.hit - 0.2);
   },
-  b: (b, P, Q, T, side, impact) => {
-    b.fx.charge(() => P.world('orb'), side, { dur: T.launch - 0.1, delay: 0.1 });
-    b.sfx('charge', 0.1);
-    b.sfx('zap', T.launch);
-    b.fx.projectile(() => P.world('orb'), impact, side, { delay: T.launch, dur: T.hit - T.launch, arc: 0.12 });
+  b: (b, P, Q, T, side, impact, blocked) => {
+    b.sfx('whoosh', T.hit - 0.25);
+    if (!blocked) b.at(T.hit, () => b.fx.shockwave(Q.root.position, side, { size: 1.0 }));   // der Schlag erschüttert den Boden
   },
   r: (b, P, Q, T, side, impact) => {
     b.at(T.launch, () => {
@@ -44,9 +39,10 @@ const CHOREO = {
     });
     b.fx.projectile(() => P.world('muzzle'), impact, side, { delay: T.launch, dur: T.hit - T.launch, arc: 0.7, size: 0.09 });
   },
-  q: (b, P, Q, T, side, impact) => {
-    b.fx.volley(() => P.world('center'), impact, side, { start: 0.4, launch: T.launch, hit: T.hit });
-    b.sfx('shards', T.launch);
+  q: (b, P, Q, T, side) => {
+    b.sfx('whoosh', T.hit * 0.45);
+    b.sfx('whoosh', T.hit - 0.15);
+    b.fx.slash(() => P.world('center'), P.root.rotation.y, side, { delay: T.hit - 0.2, horizontal: true, radius: 0.75 });
   },
   k: (b, P, Q, T, side) => {
     b.sfx('whoosh', T.hit - 0.2);
@@ -54,42 +50,42 @@ const CHOREO = {
   },
 };
 
-// wo ein abgewehrter Angriff landet: vor dem Verteidiger – beim Ausweichen daneben ins Leere
+// wo ein abgewehrter Angriff landet: an Schild oder Waffe vor dem Verteidiger
 function guardPoint(Q, P, kind) {
-  const hit = Q.world('hit'), toP = P.root.position.clone().sub(Q.root.position).setY(0).normalize();
-  if (kind === 'dodge') return hit.add(V3(-toP.z, 0, toP.x).multiplyScalar(0.5)).setY(0.25);
-  return hit.addScaledVector(toP, kind === 'wall' ? 0.15 : 0.32);
+  const toP = P.root.position.clone().sub(Q.root.position).setY(0).normalize();
+  return Q.world('hit').addScaledVector(toP, kind === 'wall' ? 0.15 : 0.32);
 }
 
 // Abwehr sichtbar und hörbar machen
 function blockFx(b, P, Q, kind) {
-  const point = guardPoint(Q, P, kind), toP = P.root.position.clone().sub(Q.root.position).setY(0).normalize();
-  if (kind === 'barrier') {
-    b.fx.barrier(Q.world('hit'), toP, Q.color);
-    b.fx.burst(point, Q.color, { n: 24, speed: 0.7, size: 0.06 });
-    b.sfx('barrier');
+  const point = guardPoint(Q, P, kind);
+  if (kind === 'wall') {
+    b.fx.dust(point);
+    b.fx.burst(point, P.color, { n: 20, speed: 0.7 });
+    b.sfx('thud');
+    return;
   }
-  if (kind === 'shield' || kind === 'blade') {
-    b.fx.burst(point, P.color, { n: 34, speed: 0.9, size: 0.06 });
-    b.fx.flash(point, P.color, { intensity: 5 });
-    b.sfx('clang');
-  }
-  if (kind === 'wall') { b.fx.dust(point); b.fx.burst(point, P.color, { n: 20, speed: 0.7 }); b.sfx('thud'); }
-  if (kind === 'dodge') { b.fx.dust(point.setY(0.1)); b.sfx('whoosh'); }
+  // Stahl auf Stahl bzw. Schild: Funkenregen und Klirren
+  b.fx.burst(point, P.color, { n: 40, speed: 1.0, size: 0.06 });
+  b.fx.flash(point, P.color, { intensity: 5 });
+  b.sfx('clang');
 }
+
+const HEAVY = { b: true, n: true, r: true };   // Streitkolben, Lanze, Kanonenkugel: zusätzlich ein dumpfer Schlag
 
 function hitFx(b, P, Q) {
   const point = Q.world('hit');
   b.fx.burst(point, P.color, { n: 50, speed: 1.2 });
   b.fx.flash(point, P.color, { intensity: 8 });
-  b.sfx(RANGED[P.type] ? 'magicHit' : 'impact');
+  b.sfx('impact');
+  if (HEAVY[P.type]) b.sfx('thud');
 }
 
-// Clip abspielen und danach weich in die Ruhelage zurückgleiten
+// Clip abspielen und danach weich in die Ruhelage zurückgleiten (volle Drehungen zählen dabei als 0)
 async function act(b, rig, clip, speed = 1) {
   await b.play(rig, clip, { speed });
-  const end = sample(clip, clip.dur);
-  await b.tween(0.22, (k) => rig.pose(Object.fromEntries(Object.entries(end).map(([ch, v]) => [ch, v.map((x) => x * (1 - k))]))));
+  const end = Object.entries(sample(clip, clip.dur)).map(([ch, v]) => [ch, ch.endsWith('.p') ? v : v.map(turn)]);
+  await b.tween(0.22, (k) => rig.pose(Object.fromEntries(end.map(([ch, v]) => [ch, v.map((x) => x * (1 - k))]))));
 }
 
 // ein Angriff von P auf Q – abgewehrt oder als entscheidender Treffer
@@ -142,7 +138,7 @@ export async function duel(b, m, fig, victim, to) {
   const defeated = strike(b, A, V, { blocked: false });
   const shattered = defeated.then(() => {
     b.sfx(def.boxes ? 'crumble' : 'shatter');
-    return b.fx.shatter(V, dir, { boxes: def.boxes, motes: def.motes });
+    return b.fx.shatter(V, dir, { boxes: def.boxes });
   }).then(() => {
     V.dispose();
     victim.removeFromParent();

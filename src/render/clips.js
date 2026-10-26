@@ -27,7 +27,7 @@ export function sample(c, t) {
   return out;
 }
 
-// reach: Abstand zum Opfer, aus dem angegriffen wird · hit: Treffer · launch: Abschuss (Fernkampf)
+// reach: Abstand zum Opfer, aus dem angegriffen wird · hit: Treffer · launch: Abschuss (nur der Turm schießt)
 export const ATTACK = {
   // Bauer: ausholen, Ausfallschritt, Speerstoß
   p: clip(1.15, [
@@ -37,22 +37,22 @@ export const ATTACK = {
     [1.15, { 'all.p': [0.15, 0, 0], torso: ZERO, armR: ZERO, 'spear.p': ZERO, legL: ZERO, legR: ZERO, armL: ZERO }],
   ], { hit: 0.5, reach: 0.95 }),
 
-  // Springer: steigt hoch, schlägt mit den Vorderhufen und stampft auf das Opfer
-  n: clip(1.55, [
-    [0.18, { 'all.p': [-0.05, 0, 0], body: [0, 0, -0.08], neck: [0, 0, -0.15] }],
-    [0.6, { 'all.p': [0.05, 0, 0], body: [0, 0, 0.85], neck: [0, 0, -0.3], head: [0, 0, 0.35], frontL: [0, 0, 1.4], kneeL: [0, 0, -1.9], frontR: [0, 0, 1.1], kneeR: [0, 0, -1.4], tail: [0, 0, 0.6] }],
-    [0.85, { 'all.p': [0.08, 0, 0], body: [0, 0, 0.95], neck: [0, 0, -0.3], head: [0, 0, 0.35], frontL: [0, 0, 1.7], kneeL: [0, 0, -1.2], frontR: [0, 0, 1.6], kneeR: [0, 0, -1.8], tail: [0, 0, 0.6] }],
-    [1.05, { 'all.p': [0.3, 0, 0], body: [0, 0, 0.05], neck: [0, 0, 0.1], head: [0, 0, -0.1], frontL: [0, 0, 0.5], kneeL: [0, 0, -0.3], frontR: [0, 0, 0.7], kneeR: [0, 0, -0.2], tail: [0, 0, 0.2] }],
-    [1.55, { 'all.p': [0.25, 0, 0], body: ZERO, neck: ZERO, head: ZERO, frontL: ZERO, kneeL: ZERO, frontR: ZERO, kneeR: ZERO, tail: ZERO }],
-  ], { hit: 1.05, reach: 1.15 }),
+  // Springer: Reiter senkt die Lanze, das Pferd steigt kurz, prescht vor – Lanzenstoß
+  n: clip(1.6, [
+    [0.25, { 'all.p': [-0.08, 0, 0], body: [0, 0, 0.35], neck: [0, 0, -0.2], head: [0, 0, 0.25], frontL: [0, 0, 0.9], kneeL: [0, 0, -1.3], frontR: [0, 0, 0.6], kneeR: [0, 0, -1.0], lance: [0, 0, -0.9], rider: [0, 0, -0.15] }],
+    [0.6, { 'all.p': [0.12, 0, 0], body: [0, 0, -0.05], neck: [0, 0, 0.1], head: [0, 0, -0.1], frontL: [0, 0, -0.5], kneeL: [0, 0, -0.3], frontR: [0, 0, 0.6], kneeR: [0, 0, -0.8], hindL: [0, 0, 0.4], hindR: [0, 0, -0.3], lance: [0, 0, -0.95], rider: [0, 0, -0.2], tail: [0, 0, 0.4] }],
+    [1.0, { 'all.p': [0.45, 0, 0], body: [0, 0, -0.1], neck: [0, 0, 0.15], head: [0, 0, -0.1], frontL: [0, 0, 0.5], kneeL: [0, 0, -0.6], frontR: [0, 0, -0.4], kneeR: [0, 0, -0.2], hindL: [0, 0, -0.3], hindR: [0, 0, 0.3], lance: [0, 0, -1.0], rider: [0, 0, -0.3], tail: [0, 0, 0.5] }],
+    [1.25, { 'all.p': [0.38, 0, 0], body: [0, 0, 0.12], lance: [0, 0, -0.7], rider: [0, 0, 0.05] }],
+    [1.6, { 'all.p': [0.3, 0, 0], body: ZERO, neck: ZERO, head: ZERO, frontL: ZERO, kneeL: ZERO, frontR: ZERO, kneeR: ZERO, hindL: ZERO, hindR: ZERO, lance: ZERO, rider: ZERO, tail: ZERO }],
+  ], { hit: 1.0, reach: 1.25 }),
 
-  // Läufer: hebt den Stab, die Kugel lädt sich auf, Stoß nach vorn schleudert sie aufs Opfer
-  b: clip(1.65, [
-    [0.45, { body: [0, 0, 0.12], armR: [0, 0, 1.5], staff: [0, 0, -0.9], armL: [0, 0, 0.6], head: [0, 0, 0.1] }],
-    [0.8, { 'all.p': [0.06, 0, 0], body: [0, 0, -0.18], armR: [0, 0, 1.1], staff: [0, 0, -1.4], armL: [0, 0, 1.3], head: [0, 0, 0.1] }],
-    [1.1, { 'all.p': [0.06, 0, 0], body: [0, 0, -0.1], armR: [0, 0, 0.9], staff: [0, 0, -1.2], armL: [0, 0, 1.0] }],
-    [1.65, { 'all.p': [0.06, 0, 0], body: ZERO, armR: ZERO, staff: ZERO, armL: ZERO, head: ZERO }],
-  ], { hit: 1.15, reach: 1.7, launch: 0.8 }),
+  // Läufer: holt mit dem Streitkolben weit über die Schulter aus und schmettert ihn herunter
+  b: clip(1.5, [
+    [0.35, { 'all.p': [-0.05, 0, 0], body: [0, 0, 0.25], armR: [0, 0, 2.5], mace: [0, 0, 0.5], armL: [0, 0, 0.8], head: [0, 0, 0.1] }],
+    [0.85, { 'all.p': [0.25, 0, 0], body: [0, 0, -0.4], armR: [0, 0, 0.75], mace: [0, 0, -0.9], armL: [0, 0, 0.2], head: [0, 0, -0.15] }],
+    [1.1, { 'all.p': [0.22, 0, 0], body: [0, 0, -0.3], armR: [0, 0, 0.65], mace: [0, 0, -0.8], armL: [0, 0, 0.2] }],
+    [1.5, { 'all.p': [0.15, 0, 0], body: ZERO, armR: ZERO, mace: ZERO, armL: ZERO, head: ZERO }],
+  ], { hit: 0.85, reach: 1.05 }),
 
   // Turm: grollt, hebt die Zinnen, fährt die Kanone aus und feuert im Bogen
   r: clip(1.75, [
@@ -64,14 +64,14 @@ export const ATTACK = {
     [1.75, { 'top.p': ZERO, top: ZERO, 'cannon.p': ZERO, cannon: ZERO }],
   ], { hit: 1.35, reach: 2.2, launch: 0.98 }),
 
-  // Dame: schwebt auf, Arme hoch – Lichtsplitter kreisen und schießen auf das Opfer
-  q: clip(2.0, [
-    [0.5, { 'all.p': [0, 0.16, 0], armL: [2.0, 0, 0], armR: [-2.0, 0, 0], head: [0, 0, 0.15] }],
-    [0.95, { 'all.p': [0, 0.2, 0], armL: [2.3, 0, 0.2], armR: [-2.3, 0, 0.2], head: [0, 0, 0.15] }],
-    [1.1, { 'all.p': [0.05, 0.18, 0], armL: [0.3, 0, 1.5], armR: [-0.3, 0, 1.5], body: [0, 0, -0.15], head: ZERO }],
-    [1.6, { 'all.p': [0.05, 0.12, 0], armL: [0.2, 0, 1.2], armR: [-0.2, 0, 1.2], body: [0, 0, -0.08] }],
-    [2.0, { 'all.p': [0.05, 0, 0], armL: ZERO, armR: ZERO, body: ZERO }],
-  ], { hit: 1.35, reach: 1.9, launch: 1.05 }),
+  // Dame: dreht sich mit ausgestreckter Glefe einmal um sich selbst – die Klinge fegt durch den Gegner
+  q: clip(1.7, [
+    [0.3, { 'all.p': [-0.05, 0, 0], body: [0, -0.7, 0.12], armR: [0, 0, 1.4], glaive: [0, 0, -1.5], armL: [0.6, 0, 0.4] }],
+    [0.75, { 'all.p': [0.12, 0, 0], body: [0, 2.6, -0.05], armR: [0, 0, 1.5], glaive: [0, 0, -1.6], armL: [0.9, 0, 0.2] }],
+    [1.05, { 'all.p': [0.2, 0, 0], body: [0, 6.283, -0.2], armR: [0, 0, 1.5], glaive: [0, 0, -1.65], armL: [0.8, 0, 0.3] }],
+    [1.3, { 'all.p': [0.2, 0, 0], body: [0, 6.6, -0.15], armR: [0, 0, 1.3], glaive: [0, 0, -1.4], armL: [0.5, 0, 0.3] }],
+    [1.7, { 'all.p': [0.15, 0, 0], body: [0, 6.283, 0], armR: ZERO, glaive: ZERO, armL: ZERO }],
+  ], { hit: 1.05, reach: 1.35 }),
 
   // König: Schritt nach vorn, Schwert über den Kopf, wuchtiger Hieb
   k: clip(1.5, [
@@ -86,10 +86,10 @@ export const ATTACK = {
 // Abwehrhaltung des Opfers bis zum Treffer
 export const GUARD = {
   p: clip(0.4, [[0.4, { torso: [0, 0, 0.1], armL: [0, 0, 0.35], 'spear.p': [-0.08, 0, 0] }]]),
-  n: clip(0.4, [[0.4, { body: [0, 0, 0.15], head: [0, 0, 0.3], tail: [0, 0, 0.3] }]]),
-  b: clip(0.4, [[0.4, { body: [0, 0, 0.08], armR: [0, 0, 0.5], armL: [0, 0, 0.7] }]]),
+  n: clip(0.4, [[0.4, { body: [0, 0, 0.1], head: [0, 0, 0.2], lance: [0, 0, -0.5], shield: [0, -0.4, 0] }]]),
+  b: clip(0.4, [[0.4, { body: [0, 0, 0.06], armR: [0, 0, 0.6], mace: [0, 0, -0.3], armL: [0, 0, 0.5] }]]),
   r: clip(0.4, [[0.4, { body: [0, 0, 0.03] }]]),
-  q: clip(0.4, [[0.4, { armL: [0, 0, 0.9], armR: [0, 0, 0.9], head: [0, 0, 0.1] }]]),
+  q: clip(0.4, [[0.4, { armR: [0, 0, 0.6], glaive: [0, 0, -0.5], armL: [0, 0, 0.4], head: [0, 0, 0.1] }]]),
   k: clip(0.4, [[0.4, { torso: [0, 0, 0.1] }]]),
 };
 
@@ -101,25 +101,25 @@ export const BLOCK = {
     [0.28, { armL: [0, 0, 0.6], torso: [0, 0, 0.3], 'all.p': [-0.1, 0, 0], 'shield.p': [0.05, 0.05, 0] }],
     [0.75, { armL: ZERO, torso: ZERO, 'all.p': ZERO, 'shield.p': ZERO }],
   ]),
-  // Pferd springt zur Seite weg und wirft den Kopf herum
+  // Reiter reißt den Schild hoch, das Pferd weicht ein Stück aus
   n: clip(0.8, [
-    [0.15, { 'all.p': [-0.08, 0, 0.24], all: [0, 0.5, 0], body: [0, 0, 0.12], neck: [0, 0, -0.2], head: [0, 0, 0.35], frontL: [0, 0, 0.5], kneeL: [0, 0, -0.9], tail: [0, 0, 0.5] }],
-    [0.4, { 'all.p': [-0.1, 0, 0.2], all: [0, 0.35, 0], body: [0, 0, 0.06], neck: [0, 0, -0.1], head: [0, 0, 0.2], frontL: [0, 0, 0.2], kneeL: [0, 0, -0.4], tail: [0, 0, 0.3] }],
-    [0.8, { 'all.p': ZERO, all: ZERO, body: ZERO, neck: ZERO, head: ZERO, frontL: ZERO, kneeL: ZERO, tail: ZERO }],
+    [0.15, { 'all.p': [-0.08, 0, 0.12], all: [0, 0.3, 0], body: [0, 0, 0.18], head: [0, 0, 0.3], shield: [0, -0.9, 0], 'shield.p': [0.05, 0.05, 0.02], rider: [0, 0, 0.15], lance: [0, 0, 0.3] }],
+    [0.4, { 'all.p': [-0.1, 0, 0.1], all: [0, 0.2, 0], body: [0, 0, 0.1], head: [0, 0, 0.15], shield: [0, -0.9, 0], 'shield.p': [0.05, 0.05, 0.02], rider: [0, 0, 0.1], lance: [0, 0, 0.2] }],
+    [0.8, { 'all.p': ZERO, all: ZERO, body: ZERO, head: ZERO, shield: ZERO, 'shield.p': ZERO, rider: ZERO, lance: ZERO }],
   ]),
-  // Stab quer vor den Körper, Lichtschild
+  // Streitkolben quer vor den Körper
   b: clip(0.8, [
-    [0.12, { armR: [0, 0, 1.3], staff: [1.4, 0, -1.0], armL: [0, 0, 1.2], body: [0, 0, 0.08] }],
-    [0.3, { armR: [0, 0, 1.2], staff: [1.4, 0, -0.9], armL: [0, 0, 1.1], body: [0, 0, 0.2], 'all.p': [-0.06, 0, 0] }],
-    [0.8, { armR: ZERO, staff: ZERO, armL: ZERO, body: ZERO, 'all.p': ZERO }],
+    [0.12, { armR: [0, 0, 1.4], mace: [1.4, 0, -0.6], armL: [0, 0, 1.3], body: [0, 0, 0.1] }],
+    [0.3, { armR: [0, 0, 1.3], mace: [1.4, 0, -0.5], armL: [0, 0, 1.2], body: [0, 0, 0.22], 'all.p': [-0.07, 0, 0] }],
+    [0.8, { armR: ZERO, mace: ZERO, armL: ZERO, body: ZERO, 'all.p': ZERO }],
   ]),
   // Turm steckt den Treffer weg und bebt
   r: clip(0.7, [[0.1, { body: [0.04, 0, 0.06] }], [0.2, { body: [-0.04, 0, -0.03] }], [0.3, { body: [0.02, 0, 0.03] }], [0.7, { body: ZERO }]]),
-  // Hände nach vorn, Lichtbarriere
+  // Glefe schräg vor den Körper
   q: clip(0.8, [
-    [0.12, { armL: [0.3, 0, 1.4], armR: [-0.3, 0, 1.4], body: [0, 0, 0.1] }],
-    [0.3, { armL: [0.35, 0, 1.3], armR: [-0.35, 0, 1.3], body: [0, 0, 0.2], 'all.p': [-0.07, 0, 0] }],
-    [0.8, { armL: ZERO, armR: ZERO, body: ZERO, 'all.p': ZERO }],
+    [0.12, { armR: [-0.2, 0, 1.2], glaive: [1.1, 0, -0.4], armL: [0.2, 0, 1.2], body: [0, 0, 0.1] }],
+    [0.3, { armR: [-0.2, 0, 1.1], glaive: [1.1, 0, -0.3], armL: [0.2, 0, 1.1], body: [0, 0, 0.22], 'all.p': [-0.08, 0, 0] }],
+    [0.8, { armR: ZERO, glaive: ZERO, armL: ZERO, body: ZERO, 'all.p': ZERO }],
   ]),
   // Parade: Klinge quer nach oben
   k: clip(0.8, [
@@ -129,8 +129,8 @@ export const BLOCK = {
   ]),
 };
 // womit abgewehrt wird – bestimmt Effekt und Klang
-export const BLOCK_KIND = { p: 'shield', k: 'blade', n: 'dodge', r: 'wall', b: 'barrier', q: 'barrier' };
-export const RANGED = { b: true, r: true, q: true };
+export const BLOCK_KIND = { p: 'shield', n: 'shield', k: 'blade', b: 'blade', q: 'blade', r: 'wall' };
+export const RANGED = { r: true };
 
 // Niederlage ab dem Treffer; am Ende zerspringt die Figur
 export const DEFEAT = {
@@ -141,32 +141,32 @@ export const DEFEAT = {
     [0.55, { 'all.p': [-0.22, -0.08, 0], torso: [0, 0, -0.35], head: [0, 0, -0.2], legL: [0, 0, 0.9], legR: [0, 0, -0.5], armL: [0, 0, 0.2], armR: [0, 0, 0.3] }],
     [0.8, { 'all.p': [-0.22, -0.1, 0], torso: [0, 0, -0.5], head: [0, 0, -0.2], legL: [0, 0, 0.9], legR: [0, 0, -0.5] }],
   ]),
-  // bäumt sich auf und kippt zur Seite
+  // Pferd bäumt sich auf, der Reiter sackt zusammen, beide kippen zur Seite
   n: clip(0.9, [
-    [0, { body: [0, 0, 0.15], head: [0, 0, 0.3] }],
-    [0.25, { 'all.p': [-0.15, 0, 0], body: [0, 0, 0.55], neck: [0, 0, -0.3], frontL: [0, 0, 1.0], kneeL: [0, 0, -1.4], frontR: [0, 0, 0.8], kneeR: [0, 0, -1.2] }],
-    [0.7, { 'all.p': [-0.2, -0.04, 0], all: [1.2, 0, 0], body: [0, 0, 0.1], frontL: [0, 0, 0.4], frontR: [0, 0, 0.6] }],
-    [0.9, { 'all.p': [-0.2, -0.06, 0], all: [1.35, 0, 0] }],
+    [0, { body: [0, 0, 0.1], head: [0, 0, 0.2], lance: [0, 0, -0.5] }],
+    [0.25, { 'all.p': [-0.15, 0, 0], body: [0, 0, 0.55], neck: [0, 0, -0.3], frontL: [0, 0, 1.0], kneeL: [0, 0, -1.4], frontR: [0, 0, 0.8], kneeR: [0, 0, -1.2], rider: [0, 0, 0.5], lance: [0, 0, 0.6] }],
+    [0.7, { 'all.p': [-0.2, -0.04, 0], all: [1.2, 0, 0], body: [0, 0, 0.1], frontL: [0, 0, 0.4], frontR: [0, 0, 0.6], rider: [0.4, 0, 0.8], lance: [0, 0, 1.0] }],
+    [0.9, { 'all.p': [-0.2, -0.06, 0], all: [1.35, 0, 0], rider: [0.5, 0, 0.9] }],
   ]),
-  // taumelt, dreht sich weg, der Stab entgleitet – löst sich in Licht auf
+  // taumelt, dreht sich weg, der Streitkolben entgleitet
   b: clip(1.0, [
-    [0, { body: [0, 0, 0.08], armR: [0, 0, 0.5] }],
+    [0, { body: [0, 0, 0.06], armR: [0, 0, 0.6], mace: [0, 0, -0.3] }],
     [0.2, { 'all.p': [-0.15, 0, 0], body: [0, 0, 0.45], head: [0, 0, 0.35], armR: [0, 0, -0.6], armL: [-0.8, 0, 0.4] }],
-    [0.6, { 'all.p': [-0.2, 0, 0], all: [0, 0.8, 0], body: [0, 0, -0.3], head: [0, 0, -0.2], armR: [0, 0, 0.2], 'staff.p': [0, -0.25, 0], staff: [0.9, 0, 0] }],
-    [1.0, { 'all.p': [-0.2, -0.1, 0], all: [0, 1.2, 0], body: [0, 0, -0.55], 'staff.p': [0, -0.35, 0], staff: [1.4, 0, 0] }],
-  ], { motes: true }),
+    [0.6, { 'all.p': [-0.2, 0, 0], all: [0, 0.8, 0], body: [0, 0, -0.3], head: [0, 0, -0.2], armR: [0, 0, 0.2], 'mace.p': [0, -0.2, 0], mace: [0.9, 0, 0.6] }],
+    [1.0, { 'all.p': [-0.2, -0.1, 0], all: [0, 1.2, 0], body: [0, 0, -0.55], 'mace.p': [0, -0.3, 0], mace: [1.4, 0, 1.2] }],
+  ]),
   // bebt, Risse glühen, neigt sich nach hinten – die Zinnen rutschen ab
   r: clip(0.9, [
     [0, { body: [0, 0, 0.03] }],
     [0.1, { body: [0.05, 0, 0.06] }], [0.2, { body: [-0.05, 0, -0.04] }], [0.3, { body: [0.03, 0, 0.05] }],
     [0.9, { body: [0.12, 0, 0.35], 'top.p': [-0.08, -0.04, 0.05], top: [0.2, 0.3, 0.4] }],
   ], { boxes: true }),
-  // wirbelt herum und sinkt nieder, die Krone fällt
+  // wirbelt herum und sinkt nieder, Glefe und Krone fallen
   q: clip(1.1, [
-    [0, { armL: [0, 0, 0.9], armR: [0, 0, 0.9] }],
+    [0, { armR: [0, 0, 0.6], glaive: [0, 0, -0.5] }],
     [0.15, { 'all.p': [-0.12, 0, 0], body: [0, 0, 0.35], head: [0, 0, 0.3], armL: [0.9, 0, 0.2], armR: [-0.9, 0, 0.2] }],
-    [0.7, { 'all.p': [-0.15, -0.04, 0], all: [0, 3.4, 0], body: [0, 0, -0.1], armL: [0.4, 0, 0], armR: [-0.4, 0, 0], 'crown.p': [-0.06, 0.08, 0], crown: [0, 0, 0.6] }],
-    [1.1, { 'all.p': [-0.15, -0.12, 0], all: [0, 3.6, 0], body: [0, 0, -0.45], head: [0, 0, -0.3], 'crown.p': [-0.25, -0.3, 0.05], crown: [0.4, 0, 1.6] }],
+    [0.7, { 'all.p': [-0.15, -0.04, 0], all: [0, 3.4, 0], body: [0, 0, -0.1], armL: [0.4, 0, 0], armR: [-0.4, 0, 0], 'crown.p': [-0.06, 0.08, 0], crown: [0, 0, 0.6], 'glaive.p': [0, -0.15, 0], glaive: [0.7, 0, 0.4] }],
+    [1.1, { 'all.p': [-0.15, -0.12, 0], all: [0, 3.6, 0], body: [0, 0, -0.45], head: [0, 0, -0.3], 'crown.p': [-0.25, -0.3, 0.05], crown: [0.4, 0, 1.6], 'glaive.p': [0, -0.25, 0], glaive: [1.3, 0, 0.6] }],
   ]),
 };
 DEFEAT.k = DEFEAT.p;   // ein König wird nie geschlagen – nur zur Sicherheit

@@ -85,7 +85,7 @@ export class Hud {
         <button class="btn" data-act="joinForm">Mit Code beitreten</button>
         <button class="btn" data-act="cpuForm">Gegen den Computer</button>
         <button class="btn" data-act="localForm">Am selben Gerät spielen</button>
-        <p class="fine">Version 0.5 · Schlagabtausche mit Abwehr, Sound &amp; Musik · gegen den Computer · Schachuhr, Chat</p>
+        <p class="fine">Version 0.6 · Ritterkämpfe mit Lanze, Streitkolben &amp; Glefe · Sound &amp; Musik · gegen den Computer</p>
       </section>`);
   }
 

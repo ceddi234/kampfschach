@@ -4,9 +4,9 @@ Animiertes 3D-Schach für zwei – online per Raum-Code oder am selben Gerät.
 Läuft komplett im Browser, ohne Konto und ohne eigenen Server.
 
 Beim Schlagen **erwachen die Figuren**: Die Marmor- und Obsidianfiguren verlassen ihren Sockel, werden zu lebendigen
-Steinwesen mit leuchtenden Adern und kämpfen – Speerstoß, Hufschlag, Zauberkugel, Kanonenkugel, Lichtsplitter,
-Schwerthieb. Vor dem entscheidenden Treffer gibt es ein bis drei Schlagabtausche: Der Verteidiger wehrt ab (Schild,
-Parade, Ausweichen, Lichtkuppel, Turmmauer) und schlägt zurück. Der Verlierer zerspringt, der Sieger wird wieder zur
+Steinwesen mit leuchtenden Adern und kämpfen mit Stahl – Soldat mit Speer und Schild, Reiter mit Lanze, Kampfpriester
+mit Streitkolben, Wehrturm mit Kanone, Kriegerkönigin mit Glefe, König mit Zweihänder. Vor dem entscheidenden Treffer
+gibt es ein bis drei Schlagabtausche: Der Verteidiger pariert (Schild, Klinge, Turmmauer) und schlägt zurück. Der Verlierer zerspringt, der Sieger wird wieder zur
 Figur. Ein Klick aufs Brett überspringt den Kampf, im ⚙-Menü lassen sich Kämpfe, Ton und Musik abschalten.
 Bei Schachmatt kippt der König um.
 

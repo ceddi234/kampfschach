@@ -1,4 +1,4 @@
-// Effekte für die Kämpfe: Funken, Wirbel, Lichtblitz, Geschosse, Schwerthieb, Druckwelle, Zerspringen.
+// Effekte für die Kämpfe: Funken, Wirbel, Lichtblitz, Kanonenkugel, Hiebe, Druckwelle, Staub, Zerspringen.
 // Jeder Effekt ist ein Tween des Bretts und räumt bei k = 1 hinter sich auf (wichtig fürs Überspringen).
 // Positionen dürfen Funktionen sein – sie werden erst beim Start ausgewertet (Figuren bewegen sich ja).
 import * as THREE from 'three';
@@ -92,18 +92,6 @@ export class FX {
     }, delay);
   }
 
-  // Leuchtkugel sammelt Kraft (Stab des Läufers)
-  charge(pos, side, { dur = 0.6, delay = 0 } = {}) {
-    let m;
-    return this.b.tween(dur, (k) => {
-      if (!m) m = this.#glowMesh(new THREE.IcosahedronGeometry(0.06, 1), side, 3, { blending: THREE.AdditiveBlending });
-      m.position.copy(at(pos));
-      m.scale.setScalar(0.5 + 1.3 * k + 0.15 * Math.sin(k * 40));
-      m.material.opacity = 0.35 + 0.5 * k;
-      if (k >= 1) this.#drop(m);
-    }, delay);
-  }
-
   // Geschoss im Bogen von a nach b, mit Leuchtspur
   projectile(from, to, side, { dur = 0.35, delay = 0, arc = 0.25, size = 0.07 } = {}) {
     let ball, trail, a, b;
@@ -126,41 +114,16 @@ export class FX {
     }, delay);
   }
 
-  // Splitter kreisen um die Dame und schießen dann nacheinander auf das Ziel
-  volley(center, target, side, { n = 5, start = 0.4, launch = 1.0, hit = 1.3, stagger = 0.07 } = {}) {
-    let shards, flyFrom = null;
-    const end = hit + stagger * (n - 1), span = end - start, flight = hit - launch;
-    return this.b.tween(span, (k) => {
-      const t = start + k * span;
-      if (!shards) shards = Array.from({ length: n }, () => this.#glowMesh(new THREE.OctahedronGeometry(0.045, 0), side, 4));
-      const c = at(center);
-      shards.forEach((s, i) => {
-        const go = launch + stagger * i;
-        if (t < go) {
-          const ang = (t - start) * 6 + (i / n) * Math.PI * 2;
-          s.position.set(c.x + Math.cos(ang) * 0.38, c.y + 0.1 * Math.sin(ang * 2), c.z + Math.sin(ang) * 0.38);
-          s.rotation.y = ang * 2;
-        } else {
-          flyFrom ||= [];
-          flyFrom[i] ||= s.position.clone();
-          const f = Math.min(1, (t - go) / flight);
-          s.position.lerpVectors(flyFrom[i], at(target), smooth(f));
-          s.visible = f < 1;
-        }
-      });
-      if (k >= 1) shards.forEach((s) => this.#drop(s));
-    }, start);
-  }
-
-  // leuchtender Bogen eines Schwerthiebs (in der Ebene vorwärts/oben des Angreifers)
-  slash(center, yaw, side, { delay = 0, radius = 0.55 } = {}) {
+  // leuchtender Bogen eines Hiebs: senkrecht (von oben nach vorn) oder waagerecht (Rundumschlag)
+  slash(center, yaw, side, { delay = 0, radius = 0.55, horizontal = false } = {}) {
     let m;
     return this.b.tween(0.35, (k) => {
       if (!m) {
-        m = this.#glowMesh(new THREE.TorusGeometry(radius, 0.03, 4, 32, Math.PI * 0.85), side, 3,
+        m = this.#glowMesh(new THREE.TorusGeometry(radius, 0.03, 4, 32, Math.PI * (horizontal ? 1.4 : 0.85)), side, 3,
                            { blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
         m.position.copy(at(center));
-        m.rotation.set(0, yaw, -0.6);
+        if (horizontal) { m.rotation.order = 'YXZ'; m.rotation.set(Math.PI / 2, yaw, 0); }
+        else m.rotation.set(0, yaw, -0.6);
       }
       m.scale.setScalar(0.85 + 0.3 * k);
       m.material.opacity = 1 - k;
@@ -168,27 +131,7 @@ export class FX {
     }, delay);
   }
 
-  // Lichtschild: halbe Kuppel um den Verteidiger, dem Angreifer zugewandt – auch von der Seite gut zu sehen
-  barrier(center, facing, side, { delay = 0 } = {}) {
-    let shell, rim;
-    return this.b.tween(0.6, (k) => {
-      if (!shell) {
-        const extra = { blending: THREE.AdditiveBlending, side: THREE.DoubleSide };
-        shell = this.#glowMesh(new THREE.SphereGeometry(0.5, 24, 12, 0, Math.PI), side, 1.2, extra);
-        rim = this.#glowMesh(new THREE.SphereGeometry(0.5, 24, 12, 0, Math.PI), side, 3, { ...extra, wireframe: true });
-        const p = at(center), yaw = Math.atan2(facing.x, facing.z);
-        for (const m of [shell, rim]) { m.position.copy(p); m.rotation.set(0, yaw, 0); }
-      }
-      const f = Math.sin(Math.PI * Math.min(1, k * 1.2));
-      shell.material.opacity = 0.22 * f;
-      rim.material.opacity = 0.35 * f;
-      shell.scale.setScalar(0.9 + 0.15 * k);
-      rim.scale.copy(shell.scale);
-      if (k >= 1) { this.#drop(shell); this.#drop(rim); }
-    }, delay);
-  }
-
-  // Staubwolke (Ausweichen, Stein)
+  // Staubwolke (Stein, Aufprall)
   dust(pos, { delay = 0 } = {}) {
     return this.burst(pos, 'w', { n: 26, speed: 0.5, size: 0.09, life: 0.6, color: 0xa79a86, glow: 0.9, delay });
   }
@@ -208,7 +151,7 @@ export class FX {
   }
 
   // Figur zerspringt: Splitter in ihrem Material fliegen weg, rollen aus und vergehen
-  shatter(rig, away, { boxes = false, n = 46, life = 1.5, motes = false } = {}) {
+  shatter(rig, away, { boxes = false, n = 46, life = 1.5 } = {}) {
     let shards, geo;
     return this.b.tween(life, (k) => {
       if (!shards) {
@@ -230,7 +173,6 @@ export class FX {
           return m;
         });
         this.burst(center.clone().setY(0.5), rig.color, { n: 50, speed: 1.3 });
-        if (motes) this.swirl(center, rig.color, { dur: 1.2, radius: 0.3, height: 1.4 });
       }
       const t = k * life;
       for (const m of shards) {

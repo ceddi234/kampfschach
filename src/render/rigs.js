@@ -92,7 +92,7 @@ export class Rig {
 
   dispose() {
     this.root.removeFromParent();
-    this.root.traverse((o) => { if (o.isMesh && o.geometry !== PEDESTAL) o.geometry.dispose(); });
+    this.root.traverse((o) => { if (o.isMesh && o.geometry !== PEDESTAL && !o.geometry.userData.shared) o.geometry.dispose(); });
   }
 }
 
@@ -128,7 +128,7 @@ function pawn(r) {
   r.anchor('hit', 'torso', [0.05, 0.12, 0]);
 }
 
-// ---------- Springer: steigendes Marmorpferd ----------
+// ---------- Springer: Reiter mit Lanze und Schild auf dem Marmorpferd ----------
 function knight(r) {
   r.mesh(PEDESTAL, 'all');
   const hip = [-0.22, 0.66];
@@ -167,15 +167,33 @@ function knight(r) {
   r.anchor('hoof', 'kneeR', [0, -0.22, 0]);
   r.joint('tail', 'body', [-0.1, 0.05, 0]);
   r.limb('tail', [0, 0, 0], [-0.18, -0.3, 0], 0.05, 0.018);
+  // Reiter sitzt auf dem Rücken und kippt beim Steigen mit
+  r.joint('rider', 'body', [0.2, 0.15, 0]);
+  for (const s of [-1, 1]) r.limb('rider', [0, 0.02, s * 0.06], [0.07, -0.13, s * 0.14], 0.035, 0.03);
+  r.mesh(cyl(0.075, 0.09, 0.2, 6), 'rider', [0, 0.11, 0]);
+  r.joint('helm', 'rider', [0, 0.27, 0]);
+  r.mesh(cyl(0.065, 0.07, 0.12, 8), 'helm');
+  r.glowMesh(box(0.012, 0.015, 0.09), 'helm', [0.066, 0.01, 0]);
+  r.mesh(cone(0.03, 0.12, 5), 'helm', [-0.01, 0.11, 0], [0, 0, 0.3]);
+  r.limb('rider', [0, 0.17, 0.09], [0.04, 0.05, 0.11], 0.03, 0.025);
+  r.joint('lance', 'rider', [0.04, 0.05, 0.11], [0, 0, 0.9]);   // Lanze ruht schräg nach oben
+  r.limb('lance', [-0.18, 0, 0], [0.78, 0, 0], 0.03, 0.01);
+  r.mesh(cone(0.06, 0.08, 8), 'lance', [0.04, 0, 0], [0, 0, -Math.PI / 2]);
+  r.glowMesh(cone(0.016, 0.06, 4), 'lance', [0.8, 0, 0], [0, 0, -Math.PI / 2]);
+  r.anchor('tip', 'lance', [0.82, 0, 0]);
+  r.joint('shield', 'rider', [0.03, 0.12, -0.11], [0, 0.9, 0]);   // Schild am linken Arm, schräg nach vorn
+  r.mesh(box(0.025, 0.19, 0.14), 'shield');
+  r.mesh(cone(0.07, 0.07, 4), 'shield', [0, -0.13, 0], [Math.PI, 0, 0]).scale.set(0.35, 1, 1);
+  r.glowMesh(torus(0.035, 0.007, 12), 'shield', [0.015, 0.02, 0], [0, Math.PI / 2, 0]);
   r.anchor('hit', 'body', [0.24, 0.02, 0]);
 }
 
-// ---------- Läufer: Magier mit Mitra (leuchtender Schlitz) und Stab ----------
+// ---------- Läufer: Kampfpriester mit Mitra (leuchtender Schlitz) und schwerem Streitkolben ----------
 function bishop(r) {
   r.mesh(PEDESTAL, 'all');
   r.joint('body', 'all', [0, 0.17, 0]);
   r.mesh(latheGeo([[0, 0], [0.22, 0], [0.2, 0.08], [0.15, 0.3], [0.12, 0.5], [0.11, 0.6], [0, 0.6]], 8), 'body');
-  r.glowMesh(torus(0.118, 0.012), 'body', [0, 0.47, 0], [Math.PI / 2, 0, 0]);
+  r.mesh(torus(0.118, 0.016), 'body', [0, 0.47, 0], [Math.PI / 2, 0, 0]);
   r.mesh(cyl(0.13, 0.11, 0.06, 8), 'body', [0, 0.6, 0]);
   r.joint('head', 'body', [0, 0.69, 0]);
   r.mesh(ico(0.07, 1), 'head');
@@ -186,19 +204,23 @@ function bishop(r) {
   r.joint('armR', 'body', [0, 0.6, 0.13]);
   r.limb('armR', [0, 0, 0], [0.06, -0.17, 0.02], 0.035, 0.03);
   r.mesh(cone(0.06, 0.12, 6), 'armR', [0.045, -0.13, 0.015]);
-  r.joint('staff', 'armR', [0.06, -0.17, 0.02]);
-  r.limb('staff', [0, -0.32, 0], [0, 0.5, 0], 0.014, 0.014);
-  r.mesh(torus(0.05, 0.012, 12), 'staff', [0, 0.56, 0]);
-  r.glowMesh(ico(0.04, 1), 'staff', [0, 0.56, 0]);
-  r.anchor('orb', 'staff', [0, 0.56, 0]);
+  r.joint('mace', 'armR', [0.06, -0.17, 0.02], [0, 0, -0.5]);   // Kolben schräg nach vorn oben
+  r.limb('mace', [0, -0.1, 0], [0, 0.36, 0], 0.02, 0.02);
+  r.mesh(ico(0.07), 'mace', [0, 0.42, 0]);
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * Math.PI * 2;
+    r.mesh(box(0.06, 0.11, 0.02), 'mace', [Math.cos(a) * 0.065, 0.42, Math.sin(a) * 0.065], [0, -a, 0]);
+  }
+  r.mesh(cone(0.02, 0.08, 4), 'mace', [0, 0.52, 0]);
+  r.glowMesh(torus(0.028, 0.008, 10), 'mace', [0, 0.33, 0], [Math.PI / 2, 0, 0]);
+  r.anchor('head', 'mace', [0, 0.42, 0]);
   r.joint('armL', 'body', [0, 0.6, -0.13]);
   r.limb('armL', [0, 0, 0], [0.08, -0.15, -0.02], 0.035, 0.03);
   r.mesh(cone(0.06, 0.12, 6), 'armL', [0.06, -0.11, -0.015]);
-  r.anchor('palm', 'armL', [0.1, -0.17, -0.02]);
   r.anchor('hit', 'body', [0.05, 0.42, 0]);
 }
 
-// ---------- Turm: lebendiger Wehrturm, öffnet die Zinnen und feuert eine Leuchtkugel ----------
+// ---------- Turm: lebendiger Wehrturm, öffnet die Zinnen und feuert eine Kanonenkugel ----------
 function rook(r) {
   r.joint('body', 'all');
   r.mesh(latheGeo([[0, 0], [0.36, 0], [0.37, 0.04], [0.33, 0.08], [0.3, 0.1], [0.3, 0.14], [0.26, 0.17], [0.25, 0.22], [0.21, 0.3],
@@ -220,7 +242,15 @@ function rook(r) {
   r.anchor('hit', 'body', [0.1, 0.5, 0]);
 }
 
-// ---------- Dame: Zauberin mit Krone und Lichtring ----------
+// ---------- Dame: Kriegerkönigin mit Krone und Glefe (Stangenwaffe mit gebogener Klinge) ----------
+const GLAIVE_BLADE = (() => {
+  const P = [[0, 0.5], [0.05, 0.55], [0.08, 0.68], [0.045, 0.82], [0, 0.9], [-0.015, 0.72], [-0.02, 0.55]];
+  const shape = new THREE.Shape();
+  shape.moveTo(...P[0]); P.slice(1).forEach((p) => shape.lineTo(...p)); shape.closePath();
+  return new THREE.ExtrudeGeometry(shape, { depth: 0.016, bevelEnabled: false }).translate(0, 0, -0.008);
+})();
+GLAIVE_BLADE.userData.shared = true;
+
 function queen(r) {
   r.mesh(PEDESTAL, 'all');
   r.joint('body', 'all', [0, 0.17, 0]);
@@ -230,7 +260,6 @@ function queen(r) {
   r.joint('head', 'body', [0, 0.8, 0]);
   r.mesh(ico(0.068, 1), 'head');
   for (const s of [-1, 1]) r.glowMesh(ico(0.011), 'head', [0.062, 0.005, s * 0.024]);
-  r.glowMesh(torus(0.12, 0.008, 32), 'head', [0, 0.2, 0], [Math.PI / 2, 0, 0]);   // schwebender Lichtring über der Krone
   r.joint('crown', 'head', [0, 0.07, 0]);
   r.mesh(cyl(0.07, 0.06, 0.04, 10), 'crown');
   for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; r.mesh(cone(0.018, 0.07), 'crown', [Math.cos(a) * 0.065, 0.05, Math.sin(a) * 0.065]); }
@@ -239,7 +268,13 @@ function queen(r) {
     r.joint(n, 'body', [0, 0.69, z]);
     r.limb(n, [0, 0, 0], [0.05, -0.22, z * 0.15], 0.03, 0.024);
   }
-  r.anchor('center', 'body', [0, 0.75, 0]);
+  r.joint('glaive', 'armR', [0.05, -0.22, 0.016], [0, 0, -0.15]);   // Glefe steht senkrecht neben ihr
+  r.limb('glaive', [0, -0.42, 0], [0, 0.5, 0], 0.017, 0.017);
+  r.mesh(cyl(0.026, 0.026, 0.035, 6), 'glaive', [0, 0.5, 0]);
+  r.mesh(GLAIVE_BLADE, 'glaive');
+  r.glowMesh(box(0.008, 0.26, 0.02), 'glaive', [0.068, 0.68, 0], [0, 0, 0.12]);
+  r.anchor('blade', 'glaive', [0.03, 0.72, 0]);
+  r.anchor('center', 'body', [0, 0.55, 0]);
   r.anchor('hit', 'body', [0.05, 0.45, 0]);
 }
 

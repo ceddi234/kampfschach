@@ -112,37 +112,14 @@ export const SFX = {
     tone(b, t, { freq: 110, to: 38, dur: 0.35, gain: 0.7, wet: 0.15 });
     noise(b, t, { dur: 0.18, type: 'lowpass', freq: 600, to: 120, gain: 0.5, wet: 0.2 });
   },
-  stomp: (b, t) => {
-    SFX.thud(b, t);
-    noise(b, t, { dur: 0.12, freq: 1400, to: 500, q: 1, gain: 0.35, wet: 0.2 });
-  },
   impact: (b, t) => {
     tone(b, t, { freq: 220, to: 60, dur: 0.3, gain: 0.5, wet: 0.15 });
     noise(b, t, { dur: 0.25, freq: 1200, to: 300, gain: 0.45, wet: 0.3 });
-  },
-  magicHit: (b, t) => {
-    SFX.impact(b, t);
-    for (const f of [1500, 2250, 3000]) tone(b, t, { freq: f, to: f * 0.5, dur: 0.45, gain: 0.05, wet: 0.7 });
   },
   cannon: (b, t) => {
     tone(b, t, { freq: 70, to: 28, dur: 1.1, gain: 0.6, wet: 0.35 });
     noise(b, t, { dur: 0.9, type: 'lowpass', freq: 900, to: 80, gain: 0.6, attack: 0.002, wet: 0.4 });
     noise(b, t, { dur: 0.06, type: 'highpass', freq: 2500, gain: 0.5, wet: 0.1 });
-  },
-  charge: (b, t) => {
-    for (let i = 0; i < 6; i++) tone(b, t + i * 0.08, { freq: 400 * Math.pow(1.19, i), dur: 0.25, gain: 0.13, wet: 0.6 });
-  },
-  zap: (b, t) => {
-    tone(b, t, { type: 'triangle', freq: 300, to: 1400, dur: 0.25, gain: 0.18, wet: 0.4 });
-    tone(b, t + 0.02, { freq: 1800, to: 600, dur: 0.3, gain: 0.08, wet: 0.5 });
-  },
-  shards: (b, t) => {
-    for (let i = 0; i < 5; i++) tone(b, t + i * 0.07, { freq: rnd(1800, 3200), to: rnd(600, 900), dur: 0.18, gain: 0.16, wet: 0.5 });
-  },
-  // magische Barriere fängt einen Treffer ab
-  barrier: (b, t) => {
-    for (const f of [880, 1320, 1760, 2640]) tone(b, t, { freq: f * rnd(0.99, 1.01), dur: 0.7, gain: 0.06, attack: 0.01, wet: 0.6 });
-    noise(b, t, { dur: 0.15, freq: 3000, q: 4, gain: 0.15, wet: 0.5 });
   },
   // Figur zerspringt
   shatter: (b, t) => {

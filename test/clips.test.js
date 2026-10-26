@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sample, ATTACK, DEFEAT, GUARD } from '../src/render/clips.js';
+import { sample, ATTACK, BLOCK, BLOCK_KIND, DEFEAT, GUARD, RANGED } from '../src/render/clips.js';
 
 describe('Clips', () => {
   it('interpoliert zwischen Schlüsselposen und hält danach die letzte', () => {
@@ -12,13 +12,16 @@ describe('Clips', () => {
     expect(sample(c, 99)['all.p']).toEqual([0.15, 0, 0]);
   });
 
-  it('hat für jede Figur Angriff, Abwehr und Niederlage', () => {
+  it('hat für jede Figur Angriff, Abwehr, Parade und Niederlage', () => {
     for (const t of 'pnbrqk') {
       expect(ATTACK[t].hit).toBeLessThan(ATTACK[t].dur);
       expect(ATTACK[t].reach).toBeGreaterThan(0.5);
       expect(GUARD[t]).toBeTruthy();
+      expect(BLOCK[t]).toBeTruthy();
+      expect(['shield', 'blade', 'wall']).toContain(BLOCK_KIND[t]);
       expect(DEFEAT[t]).toBeTruthy();
     }
-    for (const t of 'br') expect(ATTACK[t].launch).toBeLessThan(ATTACK[t].hit);   // Fernkampf: erst abfeuern, dann treffen
+    expect(Object.keys(RANGED)).toEqual(['r']);                   // nur der Turm schießt (Kanone)
+    expect(ATTACK.r.launch).toBeLessThan(ATTACK.r.hit);          // erst abfeuern, dann treffen
   });
 });

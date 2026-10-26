@@ -17,10 +17,11 @@ eigene Figuren, eigene Animationen, eigener Name. Antworten/Texte auf Deutsch.
 - `src/net/peer.js` – PeerJS-Transport: Gastgeber-ID `kampfschach-v1-<CODE>`, Heartbeat, Wiederverbinden
 - `src/render/pieces.js` – Figuren/Materialien prozedural (Lathe + Marmor-Shader, `AWAKE` mit leuchtenden Adern);
   `src/render/board3d.js` – Szene, Kamera, eigene Uhr (`time`, `advance(dt)`), Tweens, Kamerafahrt, Markierungen, Klicks
-- Kämpfe: `rigs.js` (6 erwachte Figuren als Gelenk-Rigs, +x = Richtung Gegner), `clips.js` (Schlüsselposen: Angriff mit
+- Kämpfe (Stahl statt Magie, seit v0.6): `rigs.js` (6 erwachte Figuren als Gelenk-Rigs, +x = Richtung Gegner: Speer-Soldat,
+  Reiter mit Lanze, Priester mit Streitkolben, Turm mit Kanone, Königin mit Glefe, König mit Zweihänder), `clips.js` (Schlüsselposen: Angriff mit
   `hit`/`reach`/`launch`, Abwehr, Niederlage), `fx.js` (Funken, Wirbel, Geschosse, Hieb, Druckwelle, Zerspringen),
   `duel.js` (Ablauf: Erwachen → 1–3 abgewehrte Angriffe beider Seiten (`ROUNDS`, Zahl aus Hash des Zugs → online
-  identisch) → Treffer → Zerspringen). `BLOCK`/`BLOCK_KIND` in clips.js: Schild, Parade, Ausweichen, Lichtkuppel, Mauer.
+  identisch) → Treffer → Zerspringen). `BLOCK`/`BLOCK_KIND` in clips.js: Schild, Klinge, Mauer; nur der Turm schießt (`RANGED`).
   Alles läuft über `board.tween` → `board.skip()` spult jeden Kampf sauber ans Ende
 - `src/audio/sound.js` – Sounddesign rein prozedural (Web Audio, keine Dateien): `SFX` (Effekte), `Music` (Mollakkorde,
   Glocken, Trommel bei `intensity(true)` während Kämpfen), `Sound` (Mischpult, `unlock()` nach Nutzeraktion).
