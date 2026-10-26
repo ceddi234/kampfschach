@@ -43,13 +43,13 @@ export class FX {
   }
 
   // Funken stieben in alle Richtungen
-  burst(center, side, { n = 40, speed = 1, size = 0.07, life = 0.7, delay = 0 } = {}) {
+  burst(center, side, { n = 40, speed = 1, size = 0.07, life = 0.7, delay = 0, color = GLOW_HEX[side], glow = 3 } = {}) {
     let pts, c, dirs;
     return this.b.tween(life, (k) => {
       if (!pts) {
         c = at(center);
         dirs = Array.from({ length: n }, () => V3(rand(-0.5, 0.5), rand(0, 0.9), rand(-0.5, 0.5)).normalize().multiplyScalar(rand(0.4, 1.1) * speed));
-        pts = this.#points(n, hdr(GLOW_HEX[side], 3), size);
+        pts = this.#points(n, hdr(color, glow), size);
       }
       const a = pts.geometry.attributes.position.array;
       dirs.forEach((d, i) => a.set([c.x + d.x * k, c.y + d.y * k - 0.5 * k * k, c.z + d.z * k], i * 3));
@@ -166,6 +166,31 @@ export class FX {
       m.material.opacity = 1 - k;
       if (k >= 1) this.#drop(m);
     }, delay);
+  }
+
+  // Lichtschild: halbe Kuppel um den Verteidiger, dem Angreifer zugewandt – auch von der Seite gut zu sehen
+  barrier(center, facing, side, { delay = 0 } = {}) {
+    let shell, rim;
+    return this.b.tween(0.6, (k) => {
+      if (!shell) {
+        const extra = { blending: THREE.AdditiveBlending, side: THREE.DoubleSide };
+        shell = this.#glowMesh(new THREE.SphereGeometry(0.5, 24, 12, 0, Math.PI), side, 1.2, extra);
+        rim = this.#glowMesh(new THREE.SphereGeometry(0.5, 24, 12, 0, Math.PI), side, 3, { ...extra, wireframe: true });
+        const p = at(center), yaw = Math.atan2(facing.x, facing.z);
+        for (const m of [shell, rim]) { m.position.copy(p); m.rotation.set(0, yaw, 0); }
+      }
+      const f = Math.sin(Math.PI * Math.min(1, k * 1.2));
+      shell.material.opacity = 0.22 * f;
+      rim.material.opacity = 0.35 * f;
+      shell.scale.setScalar(0.9 + 0.15 * k);
+      rim.scale.copy(shell.scale);
+      if (k >= 1) { this.#drop(shell); this.#drop(rim); }
+    }, delay);
+  }
+
+  // Staubwolke (Ausweichen, Stein)
+  dust(pos, { delay = 0 } = {}) {
+    return this.burst(pos, 'w', { n: 26, speed: 0.5, size: 0.09, life: 0.6, color: 0xa79a86, glow: 0.9, delay });
   }
 
   // Druckwelle als Ring auf dem Brett

@@ -46,6 +46,7 @@ export class Board3D {
     this.fast = false;            // überspringen: jeder Tween springt sofort ans Ende
     this.fights = true;           // Schlagzüge als Kampf zeigen
     this.busy = 0;                // laufende Kämpfe
+    this.sound = null;            // Mischpult (audio/sound.js), setzt main.js
     this.idle = [];               // wartet auf das Ende aller Kämpfe (whenIdle)
     this.cinematic = false;
     this.lifted = null;
@@ -95,14 +96,18 @@ export class Board3D {
     const promote = () => m.promotion && this.#promote(m.to, m.promotion, m.color);
     if (victim && this.fights) {
       this.busy++;
+      this.sound?.intensity(true);
       return duel(this, m, g, victim, squarePos(m.to)).finally(() => {
         if (--this.busy) return;
         this.fast = false;
+        this.sound?.intensity(false);
         this.idle.splice(0).forEach((resolve) => resolve());
       }).then(promote);
     }
     const jump = m.piece === 'n', dur = this.#duration(m.from, m.to, jump);
     const jobs = [this.slideTo(g, squarePos(m.from), squarePos(m.to), jump, dur)];
+    if (jump) this.sfx('whoosh');
+    this.sfx('move', dur * 0.92);
     if (victim) jobs.push(this.#sink(victim, dur * 0.7));
     if (m.flags.includes('k') || m.flags.includes('q')) {
       const [rf, rt] = m.flags.includes('k') ? ['h', 'f'] : ['a', 'd'], from = rf + m.from[1], to = rt + m.from[1];
@@ -110,7 +115,9 @@ export class Board3D {
       if (rook) {
         this.pieces.delete(from);
         this.#move(rook, to);
-        jobs.push(this.slideTo(rook, squarePos(from), squarePos(to), false, this.#duration(from, to, false), 0.12));
+        const rd = this.#duration(from, to, false);
+        jobs.push(this.slideTo(rook, squarePos(from), squarePos(to), false, rd, 0.12));
+        this.sfx('move', 0.12 + rd * 0.92);
       }
     }
     return Promise.all(jobs).then(promote);
@@ -122,6 +129,7 @@ export class Board3D {
     if (!g) return Promise.resolve();
     const yaw = g.rotation.y, base = g.position.clone(), r = 0.34, tilt = 1.42;
     this.fx.burst(base.clone().add(V3(0, 0.15, 0)), g.userData.color, { n: 30, speed: 0.7, delay: 0.75 });
+    this.sfx('topple', 0.62);
     return this.tween(1.0, (k) => {
       const a = tilt * bounce(k);
       // um die Sockelkante drehen, damit die Figur nicht ins Brett sinkt
@@ -204,8 +212,15 @@ export class Board3D {
 
   at(delay, fn) { return this.tween(1e-4, (k) => k >= 1 && fn(), delay); }
 
-  // Clip abspielen (dur > clip.dur hält die letzte Pose)
-  play(rig, clip, dur = clip.dur) { return this.tween(dur, (k) => rig.pose(sample(clip, k * dur))); }
+  // Clip abspielen (dur > clip.dur hält die letzte Pose, speed > 1 spielt schneller)
+  play(rig, clip, { dur = clip.dur, speed = 1 } = {}) { return this.tween(dur / speed, (k) => rig.pose(sample(clip, k * dur))); }
+
+  // Klang abspielen – beim Überspringen bleibt es still
+  sfx(name, delay = 0) {
+    if (!this.sound || this.fast) return;
+    if (delay > 0) this.at(delay, () => !this.fast && this.sound.play(name));
+    else this.sound.play(name);
+  }
 
   slideTo(g, a, b, jump, dur = jump ? 0.6 : 0.25 + a.distanceTo(b) * 0.07, delay = 0) {
     const h = jump ? 0.9 : Math.min(0.12 + a.distanceTo(b) * 0.03, 0.3);
@@ -227,14 +242,14 @@ export class Board3D {
     this.cinematic = true;
     this.controls.enabled = false;
     this.fill.position.copy(pos).lerp(mid, 0.25).add(V3(0, 0.6, 0));
-    this.tween(0.7, (k) => { this.fill.intensity = 4.5 * k; });
+    this.tween(0.7, (k) => { this.fill.intensity = 3.5 * k; });
     return this.#camTo(pos, mid, 0.7);
   }
 
   // … und zurück zur Spielansicht
   async cinemaOut() {
     if (!this.saved) return;
-    this.tween(0.7, (k) => { this.fill.intensity = 4.5 * (1 - k); });
+    this.tween(0.7, (k) => { this.fill.intensity = 3.5 * (1 - k); });
     await this.#camTo(this.saved, this.controls.target.clone(), 0.7);
     this.saved = this.look = null;
     this.cinematic = false;
@@ -445,6 +460,7 @@ export class Board3D {
   #sink(g, delay) {
     const yaw = g.rotation.y;
     this.fx.burst(g.position.clone().setY(0.45), g.userData.color, { delay });
+    this.sfx('capture', delay);
     return this.tween(0.5, (k) => {
       g.position.y = -k * k * 1.1;
       g.rotation.y = yaw + k * 4;
@@ -458,6 +474,7 @@ export class Board3D {
     const g = figurine(type, color);
     this.#place(g, sq);
     this.fx.burst(squarePos(sq, 0.5), color);
+    this.sfx('awaken');
     return this.tween(0.55, (k) => g.scale.setScalar(0.15 + 0.85 * easeBack(k)));
   }
 }

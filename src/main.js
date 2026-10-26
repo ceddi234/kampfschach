@@ -7,6 +7,7 @@ import { Hud } from './ui/hud.js';
 import { Match } from './game/match.js';
 import { TIME_CONTROLS } from './game/clock.js';
 import { Engine, levelById } from './engine/engine.js';
+import { Sound } from './audio/sound.js';
 import * as store from './store.js';
 
 let session = null;
@@ -21,6 +22,10 @@ let thinking = false;
 
 const board = new Board3D(document.getElementById('stage'), { onSquare: clickSquare, canSelect: selectable });
 board.fights = store.loadFights();
+const sound = new Sound({ sfx: store.loadSfx(), music: store.loadMusic() });
+board.sound = sound;
+// Browser geben Ton erst nach einer Nutzeraktion frei
+for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => sound.unlock(), { capture: true });
 const hud = new Hud(document.getElementById('ui'), {
   name: (v) => store.saveName(v),
   localForm: () => hud.localSetup(),
@@ -61,6 +66,18 @@ const hud = new Hud(document.getElementById('ui'), {
   result: () => hud.showEnd(session),
   closeModal: () => hud.closeModal(),
   view: () => { board.resetView(); if (session && hud.gearOpen) hud.toggleGear(session); },
+  sfx: () => {
+    hud.sfxOn = !hud.sfxOn;
+    sound.setSfx(hud.sfxOn);
+    store.saveSfx(hud.sfxOn);
+    if (session) hud.update(session);
+  },
+  music: () => {
+    hud.musicOn = !hud.musicOn;
+    sound.setMusic(hud.musicOn);
+    store.saveMusic(hud.musicOn);
+    if (session) hud.update(session);
+  },
   fights: () => {
     board.fights = hud.fights = !board.fights;
     store.saveFights(board.fights);
@@ -71,6 +88,8 @@ const hud = new Hud(document.getElementById('ui'), {
   menu: () => leave(),
 });
 hud.fights = board.fights;
+hud.sfxOn = sound.sfxOn;
+hud.musicOn = sound.musicOn;
 hud.timeChoice = store.loadTime();
 hud.levelChoice = store.loadLevel();
 const getEngine = () => (engine ||= new Engine());
@@ -83,10 +102,16 @@ function timeControl() {
 }
 
 // Uhr: Anzeige auffrischen und merken, wenn die Zeit abläuft
+let lastTick = null;
 setInterval(() => {
   if (!session) return;
   session.tick();
   hud.updateClocks(session);
+  // die letzten zehn Sekunden der eigenen Uhr ticken hörbar
+  const c = session.clock, mine = c?.running && (session.mode === 'local' || c.running === session.myColor);
+  const sec = mine ? Math.ceil(c.left(c.running) / 1000) : null;
+  if (sec !== null && sec <= 10 && sec > 0 && sec !== lastTick) sound.play('tick');
+  lastTick = sec;
 }, 200);
 
 const myName = () => store.loadName().trim() || 'Spieler';
@@ -140,8 +165,16 @@ function attach(s) {
   });
   s.on('offer', (kind) => hud.toast({ draw: 'Remis-Angebot', undo: 'Bitte um Zurücknahme', rematch: 'Revanche-Anfrage' }[kind]));
   s.on('declined', (kind) => hud.toast({ draw: 'Remis abgelehnt', undo: 'Zurücknahme abgelehnt', rematch: 'Revanche abgelehnt' }[kind]));
-  s.on('chat', (msg) => s === session && hud.onChat(s, msg));
-  s.on('emote', ({ me, e }) => s === session && hud.bubble(me ? 'left' : 'right', e));
+  s.on('chat', (msg) => {
+    if (s !== session) return;
+    hud.onChat(s, msg);
+    if (!msg.me) sound.play('pop');
+  });
+  s.on('emote', ({ me, e }) => {
+    if (s !== session) return;
+    hud.bubble(me ? 'left' : 'right', e);
+    sound.play('pop');
+  });
   s.on('outdated', () => {
     if (hud.screen === 'game') hud.toast('Ihr habt verschiedene Versionen – bitte beide die Seite neu laden.', 6000);
     else hud.setStatus('outdated');
@@ -225,6 +258,7 @@ addEventListener('resize', () => hud.screen === 'game' && board.setInset(sideIns
 
 function enterGame() {
   hud.game();
+  sound.play('start');
   board.setInset(sideInset());
   board.setIdle(false);
   orient();
@@ -287,7 +321,10 @@ function queueMove(m) {
 function afterMoves() {
   const m = session.match;
   marks();
-  if (!m.over && m.inCheck()) hud.toast('Schach!');
+  if (!m.over && m.inCheck()) {
+    hud.toast('Schach!');
+    sound.play('check');
+  }
   if (m.result?.reason === 'checkmate' && !endShown) board.topple(m.kingSquare(m.turn));   // der König fällt
   checkEnd();
 }
@@ -296,7 +333,12 @@ function afterMoves() {
 function checkEnd() {
   if (!session?.match.over || endShown || pending) return;
   endShown = true;
-  setTimeout(() => session?.match.over && hud.showEnd(session), session.match.result.reason === 'checkmate' ? 1400 : 500);
+  setTimeout(() => {
+    const s = session, r = s?.match.result;
+    if (!r) return;
+    hud.showEnd(s);
+    sound.play(!r.winner ? 'draw' : s.mode === 'local' || r.winner === s.myColor ? 'win' : 'lose');
+  }, session.match.result.reason === 'checkmate' ? 1400 : 500);
 }
 
 function marks() {
@@ -336,6 +378,7 @@ function clickSquare(sq) {
 }
 
 function select(sq) {
+  if (sq && sq !== selected) sound.play('select');
   selected = sq;
   marks();
 }

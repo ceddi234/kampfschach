@@ -19,13 +19,20 @@ eigene Figuren, eigene Animationen, eigener Name. Antworten/Texte auf Deutsch.
   `src/render/board3d.js` – Szene, Kamera, eigene Uhr (`time`, `advance(dt)`), Tweens, Kamerafahrt, Markierungen, Klicks
 - Kämpfe: `rigs.js` (6 erwachte Figuren als Gelenk-Rigs, +x = Richtung Gegner), `clips.js` (Schlüsselposen: Angriff mit
   `hit`/`reach`/`launch`, Abwehr, Niederlage), `fx.js` (Funken, Wirbel, Geschosse, Hieb, Druckwelle, Zerspringen),
-  `duel.js` (Ablauf). Alles läuft über `board.tween` → `board.skip()` spult jeden Kampf sauber ans Ende
+  `duel.js` (Ablauf: Erwachen → 1–3 abgewehrte Angriffe beider Seiten (`ROUNDS`, Zahl aus Hash des Zugs → online
+  identisch) → Treffer → Zerspringen). `BLOCK`/`BLOCK_KIND` in clips.js: Schild, Parade, Ausweichen, Lichtkuppel, Mauer.
+  Alles läuft über `board.tween` → `board.skip()` spult jeden Kampf sauber ans Ende
+- `src/audio/sound.js` – Sounddesign rein prozedural (Web Audio, keine Dateien): `SFX` (Effekte), `Music` (Mollakkorde,
+  Glocken, Trommel bei `intensity(true)` während Kämpfen), `Sound` (Mischpult, `unlock()` nach Nutzeraktion).
+  Brett ruft `board.sfx(name, delay)` (still beim Überspringen)
 - `src/engine/engine.js` – Stockfish 18 Lite (Single-Thread, `public/stockfish/`, GPLv3) als Web Worker über UCI;
   `LEVELS` 1–6 = Skill Level + Suchtiefe/-zeit. Session-Modus `cpu` (`hostColor` = Farbe des Menschen, `engineMove()`),
   main.js lässt die Engine rechnen und zieht erst, wenn die Animationen fertig sind (`maybeEngineMove`)
 - `src/ui/hud.js` + `style.css` – Menü, Spielanzeige, Dialoge (Buttons über `data-act`); `src/main.js` verdrahtet alles
 - `tools/icon.html` + `tools/save-server.js` – App-Icon aus der echten Springer-Figur rendern
-- `tools/duel.html` – Kampf-Labor: `?a=n&v=p&ac=w` live, mit `&sheet` Kontaktbogen (16 Bilder über 8 s) per
+- `tools/sounds.html` – Sound-Labor: jeden Klang anhören + Offline-Pegelmessung (Spitze/RMS)
+- `tools/duel.html` – Kampf-Labor: `?a=n&v=p&ac=w` live, `&ex=1..3` Abtausche erzwingen, `&start=&total=` Zeitfenster,
+  mit `&sheet` Kontaktbogen (16 Bilder) per
   `node tools/save-server.js tools/out` nach `tools/out/` (gitignored). Wichtig zum Prüfen, weil das versteckte
   Browser-Pane keine Animationen abspielt
 

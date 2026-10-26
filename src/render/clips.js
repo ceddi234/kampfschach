@@ -93,6 +93,45 @@ export const GUARD = {
   k: clip(0.4, [[0.4, { torso: [0, 0, 0.1] }]]),
 };
 
+// Abwehr eines Angriffs, beginnt kurz vor dem Treffer
+export const BLOCK = {
+  // Schild hoch, die Wucht drückt ihn ein Stück zurück
+  p: clip(0.75, [
+    [0.12, { armL: [0, 0, 0.75], torso: [0, 0, 0.12], 'shield.p': [0.05, 0.05, 0] }],
+    [0.28, { armL: [0, 0, 0.6], torso: [0, 0, 0.3], 'all.p': [-0.1, 0, 0], 'shield.p': [0.05, 0.05, 0] }],
+    [0.75, { armL: ZERO, torso: ZERO, 'all.p': ZERO, 'shield.p': ZERO }],
+  ]),
+  // Pferd springt zur Seite weg und wirft den Kopf herum
+  n: clip(0.8, [
+    [0.15, { 'all.p': [-0.08, 0, 0.24], all: [0, 0.5, 0], body: [0, 0, 0.12], neck: [0, 0, -0.2], head: [0, 0, 0.35], frontL: [0, 0, 0.5], kneeL: [0, 0, -0.9], tail: [0, 0, 0.5] }],
+    [0.4, { 'all.p': [-0.1, 0, 0.2], all: [0, 0.35, 0], body: [0, 0, 0.06], neck: [0, 0, -0.1], head: [0, 0, 0.2], frontL: [0, 0, 0.2], kneeL: [0, 0, -0.4], tail: [0, 0, 0.3] }],
+    [0.8, { 'all.p': ZERO, all: ZERO, body: ZERO, neck: ZERO, head: ZERO, frontL: ZERO, kneeL: ZERO, tail: ZERO }],
+  ]),
+  // Stab quer vor den Körper, Lichtschild
+  b: clip(0.8, [
+    [0.12, { armR: [0, 0, 1.3], staff: [1.4, 0, -1.0], armL: [0, 0, 1.2], body: [0, 0, 0.08] }],
+    [0.3, { armR: [0, 0, 1.2], staff: [1.4, 0, -0.9], armL: [0, 0, 1.1], body: [0, 0, 0.2], 'all.p': [-0.06, 0, 0] }],
+    [0.8, { armR: ZERO, staff: ZERO, armL: ZERO, body: ZERO, 'all.p': ZERO }],
+  ]),
+  // Turm steckt den Treffer weg und bebt
+  r: clip(0.7, [[0.1, { body: [0.04, 0, 0.06] }], [0.2, { body: [-0.04, 0, -0.03] }], [0.3, { body: [0.02, 0, 0.03] }], [0.7, { body: ZERO }]]),
+  // Hände nach vorn, Lichtbarriere
+  q: clip(0.8, [
+    [0.12, { armL: [0.3, 0, 1.4], armR: [-0.3, 0, 1.4], body: [0, 0, 0.1] }],
+    [0.3, { armL: [0.35, 0, 1.3], armR: [-0.35, 0, 1.3], body: [0, 0, 0.2], 'all.p': [-0.07, 0, 0] }],
+    [0.8, { armL: ZERO, armR: ZERO, body: ZERO, 'all.p': ZERO }],
+  ]),
+  // Parade: Klinge quer nach oben
+  k: clip(0.8, [
+    [0.12, { armR: [0, 0, 1.9], sword: [0, 0, 1.2], torso: [0, 0, 0.1], armL: [0, 0, 0.5] }],
+    [0.3, { armR: [0, 0, 1.8], sword: [0, 0, 1.1], torso: [0, 0, 0.25], 'all.p': [-0.08, 0, 0] }],
+    [0.8, { armR: ZERO, sword: ZERO, torso: ZERO, armL: ZERO, 'all.p': ZERO }],
+  ]),
+};
+// womit abgewehrt wird – bestimmt Effekt und Klang
+export const BLOCK_KIND = { p: 'shield', k: 'blade', n: 'dodge', r: 'wall', b: 'barrier', q: 'barrier' };
+export const RANGED = { b: true, r: true, q: true };
+
 // Niederlage ab dem Treffer; am Ende zerspringt die Figur
 export const DEFEAT = {
   // zurückgeworfen, sinkt auf die Knie

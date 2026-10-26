@@ -45,7 +45,7 @@ function makeMat(color, { rough = 0.45, metal = 0, veins = 0, world = false, glo
 
 export const MAT = {
   white: makeMat(0xe2d9c8, { veins: 0.22 }),
-  black: makeMat(0x2b2734, { rough: 0.22, metal: 0.05 }),
+  black: makeMat(0x2b2734, { rough: 0.34, metal: 0.05 }),
   sqLight: makeMat(0xc4b496, { rough: 0.5, veins: 0.3, world: true }),
   sqDark: makeMat(0x5c3d2a, { rough: 0.6, veins: 0.35, world: true }),
   frame: makeMat(0x2a1a12, { rough: 0.55 }),
@@ -55,7 +55,7 @@ export const MAT = {
 // erwachte Figuren: gleicher Stein, dazu leuchtende Adern
 export const AWAKE = {
   w: makeMat(0xe8e0d0, { veins: 0.15, glow: GLOW_HEX.w }),
-  b: makeMat(0x2b2734, { rough: 0.22, metal: 0.05, glow: GLOW_HEX.b }),
+  b: makeMat(0x2b2734, { rough: 0.38, metal: 0.05, glow: GLOW_HEX.b }),
 };
 // reines Leuchten (Augen, Runen, Waffenspitzen)
 export const GLOW = {

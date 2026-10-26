@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Kampfschach – Sound-Labor</title>
+<style>
+  body { margin: 24px; background: #0c0a10; color: #f3e9d6; font: 15px -apple-system, system-ui, sans-serif; }
+  h1 { font: 600 24px Georgia, serif; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; max-width: 900px; }
+  button { padding: 10px; border-radius: 8px; border: 1px solid #ffffff22; background: #ffffff10; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+  button small { display: block; color: #a99f90; font-size: 12px; margin-top: 2px; }
+  button.bad { border-color: #ff6b5e; }
+</style>
+</head>
+<body>
+<h1>Sound-Labor</h1>
+<p>Klick auf einen Klang zum Anhören. Unter jedem Namen: Spitzenpegel / Lautheit (RMS) aus einer Offline-Messung.</p>
+<p><button id="music">🎵 Musik starten</button> <button id="intense">🥁 Kampf-Intensität umschalten</button></p>
+<div class="grid" id="grid"></div>
+<script type="module">
+// Alle Effekte aus src/audio/sound.js: anhören und offline vermessen (?analyze schreibt die Werte nach window.__levels)
+import { SFX, Sound, makeBus } from '../src/audio/sound.js';
+
+const sound = new Sound();
+const grid = document.getElementById('grid');
+let intense = false;
+
+async function measure(name) {
+  const sr = 44100, off = new OfflineAudioContext(2, sr * 3, sr);
+  SFX[name](makeBus(off, off.destination, 0.8), 0.05);
+  const buf = await off.startRendering();
+  let peak = 0, sum = 0;
+  for (let ch = 0; ch < 2; ch++) for (const v of buf.getChannelData(ch)) { peak = Math.max(peak, Math.abs(v)); sum += v * v; }
+  return { peak: +peak.toFixed(3), rms: +Math.sqrt(sum / (buf.length * 2)).toFixed(4) };
+}
+
+const levels = {};
+for (const name of Object.keys(SFX)) {
+  const b = document.createElement('button');
+  b.innerHTML = `${name}<small>…</small>`;
+  b.onclick = () => { sound.unlock(); sound.play(name); };
+  grid.appendChild(b);
+  levels[name] = await measure(name);
+  const { peak, rms } = levels[name];
+  b.querySelector('small').textContent = `Spitze ${peak} · RMS ${rms}`;
+  b.classList.toggle('bad', peak < 0.02 || peak > 1);
+}
+window.__levels = levels;
+document.title = 'gemessen';
+document.getElementById('music').onclick = () => { sound.unlock(); sound.setMusic(!sound.music?.on); };
+document.getElementById('intense').onclick = () => { intense = !intense; sound.intensity(intense); };
+</script>
+</body>
+</html>

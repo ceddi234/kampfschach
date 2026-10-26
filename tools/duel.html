@@ -24,6 +24,7 @@
 //                        (node tools/save-server.js tools/out) → tools/out/duel-<a>-<v>.png
 import { Board3D } from '../src/render/board3d.js';
 import { ATTACK } from '../src/render/clips.js';
+import { exchangesFor } from '../src/render/duel.js';
 
 const NAMES = { p: 'Bauer', n: 'Springer', b: 'Läufer', r: 'Turm', q: 'Dame', k: 'König' };
 // Startfeld je Angreifer, Opfer steht immer auf e5 (für Schwarz gespiegelt)
@@ -52,7 +53,9 @@ const put = (p) => { rows[8 - +p.square[1]]['abcdefgh'.indexOf(p.square[0])] = p
   .filter((p, i, all) => all.findIndex((x) => x.square === p.square) === i).forEach(put);
 board.sync(rows);
 board.setOrientation(ac, false);
-const move = { from, to, piece: a, color: ac, captured: v, flags: 'c' };
+const move = { from, to, piece: a, color: ac, captured: v, flags: 'c', before: '' };
+// &ex=1|2|3 erzwingt die Zahl der Schlagabtausche (sucht passenden Zufallswert)
+if (qs.get('ex')) for (let i = 0; exchangesFor(move) !== +qs.get('ex'); i++) move.before = String(i);
 
 if (!qs.has('sheet')) {
   setTimeout(() => board.animateMove(move), 600);
@@ -69,8 +72,9 @@ if (!qs.has('sheet')) {
   sheet.width = COLS * W; sheet.height = ROWS * H;
   const g = sheet.getContext('2d');
   g.font = '600 18px system-ui'; g.fillStyle = '#fff';
-  const total = 8;
-  const shots = Array.from({ length: COLS * ROWS }, (_, i) => (i + 1) * (total / (COLS * ROWS)));
+  const total = +qs.get('total') || 12;
+  const start = +qs.get('start') || 0;   // &start=… &total=… → nur diesen Abschnitt, dafür feiner
+  const shots = Array.from({ length: COLS * ROWS }, (_, i) => start + (i + 1) * (total / (COLS * ROWS)));
   let t = 0, i = 0;
   while (i < shots.length) {
     board.advance(step);
@@ -83,7 +87,7 @@ if (!qs.has('sheet')) {
       i++;
     }
   }
-  g.fillText(`${NAMES[a]} (${ac}) schlägt ${NAMES[v]} · Treffer bei ${atk.hit}s nach Kampfbeginn · fertig: ${finished}`, 10, sheet.height - 12);
+  g.fillText(`${NAMES[a]} (${ac}) schlägt ${NAMES[v]} · ${exchangesFor(move)} Schlagabtausch(e) · fertig: ${finished}`, 10, sheet.height - 12);
   const blob = await new Promise((r) => sheet.toBlob(r, 'image/png'));
   await fetch(`http://localhost:4632/save/duel-${a}-${v}.png`, { method: 'POST', mode: 'no-cors', body: new Blob([blob], { type: 'text/plain' }) });
   document.title = 'gespeichert';

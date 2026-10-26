@@ -45,6 +45,8 @@ export class Hud {
     this.timeChoice = 'none';
     this.levelChoice = 3;
     this.fights = true;
+    this.sfxOn = true;
+    this.musicOn = true;
     root.innerHTML = '<div id="screen"></div><div id="bubbles"></div><div id="overlay"></div><div id="toast" class="toast"></div>';
     this.el = { screen: root.querySelector('#screen'), bubbles: root.querySelector('#bubbles'), overlay: root.querySelector('#overlay'), toast: root.querySelector('#toast') };
     root.addEventListener('click', (e) => {
@@ -83,7 +85,7 @@ export class Hud {
         <button class="btn" data-act="joinForm">Mit Code beitreten</button>
         <button class="btn" data-act="cpuForm">Gegen den Computer</button>
         <button class="btn" data-act="localForm">Am selben Gerät spielen</button>
-        <p class="fine">Version 0.4 · gegen den Computer (Stockfish) · Schachuhr, Chat · beim Schlagen erwachen die Figuren</p>
+        <p class="fine">Version 0.5 · Schlagabtausche mit Abwehr, Sound &amp; Musik · gegen den Computer · Schachuhr, Chat</p>
       </section>`);
   }
 
@@ -247,6 +249,8 @@ export class Hud {
       </aside>
       ${this.gearOpen ? `<div class="gear card">
         <button class="btn" data-act="fights">⚔︎ Kämpfe: ${this.fights ? 'an' : 'aus'}</button>
+        <button class="btn" data-act="sfx">🔊 Ton: ${this.sfxOn ? 'an' : 'aus'}</button>
+        <button class="btn" data-act="music">🎵 Musik: ${this.musicOn ? 'an' : 'aus'}</button>
         <button class="btn" data-act="view">Ansicht zurücksetzen</button>
       </div>` : ''}
       <nav class="actions">
