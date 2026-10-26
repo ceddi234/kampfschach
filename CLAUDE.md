@@ -23,6 +23,8 @@ eigene Figuren, eigene Animationen, eigener Name. Antworten/Texte auf Deutsch.
   `duel.js` (Ablauf: Erwachen → 1–3 abgewehrte Angriffe beider Seiten (`ROUNDS`, Zahl aus Hash des Zugs → online
   identisch) → Treffer → Zerspringen). `BLOCK`/`BLOCK_KIND` in clips.js: Schild, Klinge, Mauer; nur der Turm schießt (`RANGED`).
   Alles läuft über `board.tween` → `board.skip()` spult jeden Kampf sauber ans Ende
+- „Lebendige Figuren“ (⚙, `board.setLiving`): Brettfiguren sind Rigs (`userData.rig`, Maßstab `LIVING_SCALE`), Leerlauf über
+  `idlePose` (clips.js) in `board.advance`, normale Züge per `march` (duel.js), Kämpfe ohne Erwachen; `rig.acting` sperrt den Leerlauf
 - `src/audio/sound.js` – Sounddesign rein prozedural (Web Audio, keine Dateien): `SFX` (Effekte), `Music` (Mollakkorde,
   Glocken, Trommel bei `intensity(true)` während Kämpfen), `Sound` (Mischpult, `unlock()` nach Nutzeraktion).
   Brett ruft `board.sfx(name, delay)` (still beim Überspringen)
@@ -32,7 +34,7 @@ eigene Figuren, eigene Animationen, eigener Name. Antworten/Texte auf Deutsch.
 - `src/ui/hud.js` + `style.css` – Menü, Spielanzeige, Dialoge (Buttons über `data-act`); `src/main.js` verdrahtet alles
 - `tools/icon.html` + `tools/save-server.js` – App-Icon aus der echten Springer-Figur rendern
 - `tools/sounds.html` – Sound-Labor: jeden Klang anhören + Offline-Pegelmessung (Spitze/RMS)
-- `tools/duel.html` – Kampf-Labor: `?a=n&v=p&ac=w` live, `&ex=1..3` Abtausche erzwingen, `&start=&total=` Zeitfenster,
+- `tools/duel.html` – Kampf-Labor: `?a=n&v=p&ac=w` live, `&ex=1..3` Abtausche erzwingen, `&living` lebendige Figuren, `&start=&total=` Zeitfenster,
   mit `&sheet` Kontaktbogen (16 Bilder) per
   `node tools/save-server.js tools/out` nach `tools/out/` (gitignored). Wichtig zum Prüfen, weil das versteckte
   Browser-Pane keine Animationen abspielt

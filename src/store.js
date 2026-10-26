@@ -1,5 +1,5 @@
 // Name und laufende Partie im Browser merken (übersteht Neuladen und App-Neustart)
-const KEY = { name: 'ks.name', game: 'ks.game', fights: 'ks.fights', time: 'ks.time', level: 'ks.level', sfx: 'ks.sfx', music: 'ks.music' };
+const KEY = { name: 'ks.name', game: 'ks.game', fights: 'ks.fights', time: 'ks.time', level: 'ks.level', sfx: 'ks.sfx', music: 'ks.music', living: 'ks.living' };
 
 const get = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 const set = (k, v) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* privates Fenster */ } };
@@ -24,3 +24,5 @@ export const loadSfx = () => get(KEY.sfx) !== '0';         // Effekte an (Standa
 export const saveSfx = (on) => set(KEY.sfx, on ? '1' : '0');
 export const loadMusic = () => get(KEY.music) !== '0';     // Musik an (Standard)
 export const saveMusic = (on) => set(KEY.music, on ? '1' : '0');
+export const loadLiving = () => get(KEY.living) === '1';    // Lebendige Figuren (Standard: Statuen)
+export const saveLiving = (on) => set(KEY.living, on ? '1' : '0');

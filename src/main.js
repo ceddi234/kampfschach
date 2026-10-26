@@ -22,6 +22,7 @@ let thinking = false;
 
 const board = new Board3D(document.getElementById('stage'), { onSquare: clickSquare, canSelect: selectable });
 board.fights = store.loadFights();
+board.setLiving(store.loadLiving());
 const sound = new Sound({ sfx: store.loadSfx(), music: store.loadMusic() });
 board.sound = sound;
 // Browser geben Ton erst nach einer Nutzeraktion frei
@@ -66,6 +67,17 @@ const hud = new Hud(document.getElementById('ui'), {
   result: () => hud.showEnd(session),
   closeModal: () => hud.closeModal(),
   view: () => { board.resetView(); if (session && hud.gearOpen) hud.toggleGear(session); },
+  living: () => {
+    hud.living = !hud.living;
+    store.saveLiving(hud.living);
+    hud.toast(hud.living ? 'Lebendige Figuren' : 'Klassische Statuen');
+    board.skip();                       // laufende Kämpfe erst zu Ende spulen
+    board.whenIdle().then(() => {
+      board.setLiving(hud.living);
+      board.sync(session ? session.match.board() : new Match().board());
+      if (session) { hud.update(session); marks(); }
+    });
+  },
   sfx: () => {
     hud.sfxOn = !hud.sfxOn;
     sound.setSfx(hud.sfxOn);
@@ -89,6 +101,7 @@ const hud = new Hud(document.getElementById('ui'), {
 });
 hud.fights = board.fights;
 hud.sfxOn = sound.sfxOn;
+hud.living = board.living;
 hud.musicOn = sound.musicOn;
 hud.timeChoice = store.loadTime();
 hud.levelChoice = store.loadLevel();

@@ -9,6 +9,7 @@ import { ease, easeBack } from './util.js';
 const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a));   // Winkel auf −π…π
 const BULK = { n: 0.25, r: 0.1 };                            // große Figuren brauchen etwas mehr Abstand
 const EXCHANGE_SPEED = 1.25;                                 // abgewehrte Angriffe laufen etwas zügiger
+export const LIVING_SCALE = 0.85;                            // Charaktere auf dem Brett etwas kleiner als im Kampf
 
 // Reihenfolge der abgewehrten Angriffe vor dem Treffer (A = Angreifer, V = Verteidiger schlägt zurück)
 const ROUNDS = { 1: ['V'], 2: ['A', 'V'], 3: ['V', 'A', 'V'] };
@@ -111,17 +112,36 @@ export async function duel(b, m, fig, victim, to) {
   const stand = from.distanceTo(cap) <= reach + 0.05 ? from.clone() : cap.clone().addScaledVector(dir, -reach);
   const yaw = -Math.atan2(dir.z, dir.x);
 
+  const living = !!fig.userData.rig;   // "Lebendige Figuren": die Charaktere stehen schon auf dem Brett
   const camIn = b.cinemaIn(stand, cap);
-  if (stand.distanceTo(from) > 0.01) await b.slideTo(fig, from, stand, m.piece === 'n');
-  await camIn;
-
-  const A = makeRig(m.piece, side), V = makeRig(m.captured, foe);
-  A.root.position.copy(stand);
-  A.root.rotation.y = yaw;
-  V.root.position.copy(cap);
-  V.root.rotation.y = yaw + Math.PI;
-  b.sfx('awaken');
-  await Promise.all([awaken(b, fig, A), awaken(b, victim, V)]);
+  let A, V;
+  if (living) {
+    A = fig.userData.rig;
+    V = victim.userData.rig;
+    A.acting = V.acting = true;
+    await Promise.all([
+      stand.distanceTo(from) > 0.01 ? walk(b, A, stand, { face: true, pace: 0.3 }) : face(b, A, yaw),
+      face(b, V, yaw + Math.PI),
+      camIn,
+    ]);
+    A.root.rotation.y = yaw;
+    b.sfx('awaken');
+    await Promise.all([A, V].map((r) => {
+      b.fx.flash(r.root.position.clone().setY(0.5), r.color, { intensity: 4 });
+      return b.tween(0.3, (k) => r.root.scale.setScalar(LIVING_SCALE + (1 - LIVING_SCALE) * easeBack(k)));
+    }));
+  } else {
+    if (stand.distanceTo(from) > 0.01) await b.slideTo(fig, from, stand, m.piece === 'n');
+    await camIn;
+    A = makeRig(m.piece, side);
+    V = makeRig(m.captured, foe);
+    A.root.position.copy(stand);
+    A.root.rotation.y = yaw;
+    V.root.position.copy(cap);
+    V.root.rotation.y = yaw + Math.PI;
+    b.sfx('awaken');
+    await Promise.all([awaken(b, fig, A), awaken(b, victim, V)]);
+  }
 
   // Schlagabtausch: beide greifen an, beide wehren ab
   for (const who of ROUNDS[exchangesFor(m)]) {
@@ -148,9 +168,28 @@ export async function duel(b, m, fig, victim, to) {
   // der Sieger geht schon los, während die Splitter noch fliegen
   A.bake();
   if (A.root.position.distanceTo(to) > 0.05) await walk(b, A, to, { face: true });
-  await settle(b, A, fig, to);
+  if (living) {
+    await face(b, A, fig.userData.yaw);
+    await b.tween(0.3, (k) => A.root.scale.setScalar(1 - (1 - LIVING_SCALE) * ease(k)));
+    A.acting = false;
+  } else await settle(b, A, fig, to);
   await shattered;
   await b.cinemaOut();
+}
+
+// "Lebendige Figuren": ein normaler Zug ist ein kleiner Marsch (Springer springen), danach wieder Blick nach vorn
+export async function march(b, rig, to, { jump = false, home }) {
+  rig.acting = true;
+  await walk(b, rig, to, { face: true, hop: jump ? 0.7 : 0, pace: 0.22 });
+  await face(b, rig, home);
+  rig.acting = false;
+}
+
+// auf der Stelle in eine Richtung drehen
+function face(b, rig, yaw, dur = 0.25) {
+  const y0 = rig.root.rotation.y, d = turn(yaw - y0);
+  if (Math.abs(d) < 0.02) return Promise.resolve();
+  return b.tween(dur, (k) => { rig.root.rotation.y = y0 + d * ease(k); });
 }
 
 // Figur spannt sich, Lichtwirbel – und an ihrer Stelle steht das erwachte Wesen
@@ -179,14 +218,16 @@ async function settle(b, rig, fig, to) {
   await b.tween(0.35, (k) => fig.scale.setScalar(0.6 + 0.4 * easeBack(k)));
 }
 
-// ein paar Schritte (bzw. Galopp); face = in Laufrichtung drehen, backwards = rückwärts mit Blick nach vorn
-function walk(b, rig, to, { face = false, backwards = false } = {}) {
+// ein paar Schritte (bzw. Galopp); face = in Laufrichtung drehen, backwards = rückwärts mit Blick nach vorn,
+// hop = Sprunghöhe (Springer), pace = Sekunden pro Feldlänge
+function walk(b, rig, to, { face = false, backwards = false, hop = 0, pace = backwards ? 0.35 : 0.45 } = {}) {
   const a = rig.root.position.clone(), d = a.distanceTo(to);
   const yaw0 = rig.root.rotation.y, dYaw = face ? turn(-Math.atan2(to.z - a.z, to.x - a.x) - yaw0) : 0;
-  const steps = Math.max(1, Math.round(d * 3)), dur = 0.25 + d * (backwards ? 0.35 : 0.45), dir = backwards ? -1 : 1;
+  const steps = Math.max(1, Math.round(d * 3)), dur = 0.25 + d * pace, dir = backwards ? -1 : 1;
   for (let i = 0; i < steps * 2; i++) b.sfx(rig.type === 'n' ? 'hoof' : 'step', ((i + 0.5) / (steps * 2)) * dur);
   return b.tween(dur, (k) => {
     rig.root.position.lerpVectors(a, to, ease(k));
+    rig.root.position.y = hop * Math.sin(Math.PI * k);
     rig.root.rotation.y = yaw0 + dYaw * Math.min(1, k * 3);
     const s = Math.sin(k * Math.PI * 2 * steps) * (1 - k) * dir;
     rig.pose({

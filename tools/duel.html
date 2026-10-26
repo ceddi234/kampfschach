@@ -44,6 +44,7 @@ document.getElementById('go').onclick = () => {
 };
 
 const board = new Board3D(document.getElementById('stage'), { onSquare() {}, canSelect: () => false });
+board.setLiving(qs.has('living'));   // &living: Charaktere statt Statuen
 const from = ac === 'w' ? FROM[a] : mirror(FROM[a]), to = ac === 'w' ? 'e5' : 'e4';
 const cell = (sq, type, color) => ({ square: sq, type, color });
 const rows = Array.from({ length: 8 }, () => Array(8).fill(null));

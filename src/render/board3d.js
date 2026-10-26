@@ -8,8 +8,9 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { MAT, figurine } from './pieces.js';
 import { FX } from './fx.js';
-import { duel } from './duel.js';
-import { sample } from './clips.js';
+import { duel, march, LIVING_SCALE } from './duel.js';
+import { sample, idlePose } from './clips.js';
+import { makeRig } from './rigs.js';
 import { V3, hdr, ease, easeBack } from './util.js';
 import { canvasTexture, radial } from './textures.js';
 
@@ -45,6 +46,7 @@ export class Board3D {
     this.manual = false;
     this.fast = false;            // überspringen: jeder Tween springt sofort ans Ende
     this.fights = true;           // Schlagzüge als Kampf zeigen
+    this.living = false;          // "Lebendige Figuren": Charaktere statt Statuen auf dem Brett
     this.busy = 0;                // laufende Kämpfe
     this.sound = null;            // Mischpult (audio/sound.js), setzt main.js
     this.idle = [];               // wartet auf das Ende aller Kämpfe (whenIdle)
@@ -73,12 +75,13 @@ export class Board3D {
       const p = want.get(sq);
       if (!p || p.type !== g.userData.type || p.color !== g.userData.color) { this.root.remove(g); this.pieces.delete(sq); }
     }
-    for (const [sq, p] of want) if (!this.pieces.has(sq)) this.#place(figurine(p.type, p.color), sq);
+    for (const [sq, p] of want) if (!this.pieces.has(sq)) this.#place(this.#makePiece(p.type, p.color), sq);
     for (const [sq, g] of this.pieces) {
       g.position.copy(squarePos(sq));
-      g.scale.setScalar(1);
+      g.scale.setScalar(g.userData.scale);
       g.rotation.set(0, g.userData.yaw, 0);
       g.visible = true;
+      if (g.userData.rig) g.userData.rig.acting = false;
     }
     this.lifted = null;
   }
@@ -105,9 +108,15 @@ export class Board3D {
       }).then(promote);
     }
     const jump = m.piece === 'n', dur = this.#duration(m.from, m.to, jump);
-    const jobs = [this.slideTo(g, squarePos(m.from), squarePos(m.to), jump, dur)];
+    const go = (piece, from, to, delay = 0) => {
+      // lebendige Figuren marschieren, Statuen gleiten
+      if (piece.userData.rig) return this.at(delay, () => {}).then(() => march(this, piece.userData.rig, squarePos(to), { jump: piece.userData.type === 'n', home: piece.userData.yaw }));
+      const d = this.#duration(from, to, piece.userData.type === 'n');
+      this.sfx('move', delay + d * 0.92);
+      return this.slideTo(piece, squarePos(from), squarePos(to), piece.userData.type === 'n', d, delay);
+    };
+    const jobs = [go(g, m.from, m.to)];
     if (jump) this.sfx('whoosh');
-    this.sfx('move', dur * 0.92);
     if (victim) jobs.push(this.#sink(victim, dur * 0.7));
     if (m.flags.includes('k') || m.flags.includes('q')) {
       const [rf, rt] = m.flags.includes('k') ? ['h', 'f'] : ['a', 'd'], from = rf + m.from[1], to = rt + m.from[1];
@@ -115,9 +124,7 @@ export class Board3D {
       if (rook) {
         this.pieces.delete(from);
         this.#move(rook, to);
-        const rd = this.#duration(from, to, false);
-        jobs.push(this.slideTo(rook, squarePos(from), squarePos(to), false, rd, 0.12));
-        this.sfx('move', 0.12 + rd * 0.92);
+        jobs.push(go(rook, from, to, 0.12));
       }
     }
     return Promise.all(jobs).then(promote);
@@ -198,6 +205,16 @@ export class Board3D {
   // Startmenü: Brett dreht sich langsam
   setIdle(on) { this.controls.autoRotate = on; }
 
+  // Statuen ↔ lebendige Figuren: alle Figuren werden neu aufgebaut (danach sync aufrufen)
+  setLiving(on) {
+    if (on === this.living) return;
+    this.living = on;
+    this.finishAll();
+    for (const g of this.pieces.values()) { g.removeFromParent(); g.userData.rig?.dispose(); }
+    this.pieces.clear();
+    this.lifted = null;
+  }
+
   // rechts verdeckter Rand in Pixeln (Zugliste) – das Brett rückt entsprechend nach links
   setInset(right) {
     this.inset = right;
@@ -277,6 +294,10 @@ export class Board3D {
       if (k >= 1) { this.tweens.splice(this.tweens.indexOf(t), 1); t.resolve(); }
     }
     if (this.lifted) this.lifted.position.y = 0.12 + Math.sin(this.time * 3.8) * 0.03;
+    if (this.living) for (const g of this.pieces.values()) {
+      const rig = g.userData.rig;
+      if (rig && !rig.acting) rig.pose(idlePose(rig.type, this.time + rig.phase));
+    }
     if (!this.cinematic) this.controls.update();
     this.composer.render();
   }
@@ -439,8 +460,23 @@ export class Board3D {
     if (!this.manual) this.advance(dt);
   }
 
+  // Statue oder (bei "Lebendigen Figuren") Charakter, der zum Gegner schaut
+  #makePiece(type, color) {
+    if (!this.living) {
+      const g = figurine(type, color);
+      g.userData.scale = 1;
+      return g;
+    }
+    const rig = makeRig(type, color), g = rig.root;
+    rig.phase = Math.random() * 20;
+    rig.pose({});
+    Object.assign(g.userData, { type, color, rig, scale: LIVING_SCALE, facing: color === 'w' ? Math.PI / 2 : -Math.PI / 2 });
+    g.scale.setScalar(LIVING_SCALE);
+    return g;
+  }
+
   #place(g, sq) {
-    g.userData.yaw = (Math.random() - 0.5) * 0.4;
+    g.userData.yaw = g.userData.facing ?? (Math.random() - 0.5) * 0.4;
     g.rotation.y = g.userData.yaw;
     g.position.copy(squarePos(sq));
     this.root.add(g);
@@ -464,17 +500,18 @@ export class Board3D {
     return this.tween(0.5, (k) => {
       g.position.y = -k * k * 1.1;
       g.rotation.y = yaw + k * 4;
-      if (k >= 1) this.root.remove(g);
+      if (k >= 1) { this.root.remove(g); g.userData.rig?.dispose(); }
     }, delay);
   }
 
   #promote(sq, type, color) {
     const old = this.pieces.get(sq);
     if (old) this.root.remove(old);
-    const g = figurine(type, color);
+    old?.userData.rig?.dispose();
+    const g = this.#makePiece(type, color);
     this.#place(g, sq);
     this.fx.burst(squarePos(sq, 0.5), color);
     this.sfx('awaken');
-    return this.tween(0.55, (k) => g.scale.setScalar(0.15 + 0.85 * easeBack(k)));
+    return this.tween(0.55, (k) => g.scale.setScalar(g.userData.scale * (0.15 + 0.85 * easeBack(k))));
   }
 }

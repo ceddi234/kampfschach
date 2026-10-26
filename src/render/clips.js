@@ -170,3 +170,17 @@ export const DEFEAT = {
   ]),
 };
 DEFEAT.k = DEFEAT.p;   // ein König wird nie geschlagen – nur zur Sicherheit
+
+// Leerlauf für "Lebendige Figuren": leises Atmen, Umschauen, Waffe wiegt sich (t = Zeit + eigene Phase)
+export function idlePose(type, t) {
+  const s = Math.sin(t * 1.6), c = Math.sin(t * 0.55), breathe = { 'all.p': [0, 0.006 * (1 + s), 0] };
+  switch (type) {
+    case 'p': return { ...breathe, torso: [0, 0.06 * c, 0.03 * s], head: [0, 0.18 * c, 0], 'spear.p': [0, 0.006 * s, 0] };
+    case 'n': return { ...breathe, neck: [0, 0, 0.05 * s], head: [0, 0.12 * c, 0.05 * s], tail: [0.15 * c, 0, 0.1 * s], rider: [0, 0.05 * c, 0.02 * s], lance: [0, 0, 0.03 * s] };
+    case 'b': return { ...breathe, body: [0, 0.06 * c, 0.02 * s], head: [0, 0.15 * c, 0], mace: [0, 0, 0.04 * s] };
+    case 'r': return { 'top.p': [0, 0.005 * (1 + s), 0], top: [0, 0.04 * c, 0] };
+    case 'q': return { ...breathe, body: [0, 0.08 * c, 0.02 * s], head: [0, 0.12 * c, 0], glaive: [0, 0, 0.03 * s] };
+    case 'k': return { ...breathe, torso: [0, 0.05 * c, 0.03 * s], head: [0, 0.12 * c, 0], cape: [0, 0, 0.06 * s] };
+  }
+  return {};
+}

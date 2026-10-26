@@ -47,6 +47,7 @@ export class Hud {
     this.fights = true;
     this.sfxOn = true;
     this.musicOn = true;
+    this.living = false;
     root.innerHTML = '<div id="screen"></div><div id="bubbles"></div><div id="overlay"></div><div id="toast" class="toast"></div>';
     this.el = { screen: root.querySelector('#screen'), bubbles: root.querySelector('#bubbles'), overlay: root.querySelector('#overlay'), toast: root.querySelector('#toast') };
     root.addEventListener('click', (e) => {
@@ -85,7 +86,7 @@ export class Hud {
         <button class="btn" data-act="joinForm">Mit Code beitreten</button>
         <button class="btn" data-act="cpuForm">Gegen den Computer</button>
         <button class="btn" data-act="localForm">Am selben Gerät spielen</button>
-        <p class="fine">Version 0.6 · Ritterkämpfe mit Lanze, Streitkolben &amp; Glefe · Sound &amp; Musik · gegen den Computer</p>
+        <p class="fine">Version 0.7 · Ritterkämpfe · lebendige Figuren (⚙) · Sound &amp; Musik · gegen den Computer</p>
       </section>`);
   }
 
@@ -248,6 +249,7 @@ export class Hud {
         ${tab === 'chat' ? this.#chat(s) : `<ol class="moves">${this.#moves(m)}</ol>`}
       </aside>
       ${this.gearOpen ? `<div class="gear card">
+        <button class="btn" data-act="living">♞︎ Figuren: ${this.living ? 'lebendig' : 'Statuen'}</button>
         <button class="btn" data-act="fights">⚔︎ Kämpfe: ${this.fights ? 'an' : 'aus'}</button>
         <button class="btn" data-act="sfx">🔊 Ton: ${this.sfxOn ? 'an' : 'aus'}</button>
         <button class="btn" data-act="music">🎵 Musik: ${this.musicOn ? 'an' : 'aus'}</button>

@@ -8,6 +8,8 @@ Steinwesen mit leuchtenden Adern und kämpfen mit Stahl – Soldat mit Speer und
 mit Streitkolben, Wehrturm mit Kanone, Kriegerkönigin mit Glefe, König mit Zweihänder. Vor dem entscheidenden Treffer
 gibt es ein bis drei Schlagabtausche: Der Verteidiger pariert (Schild, Klinge, Turmmauer) und schlägt zurück. Der Verlierer zerspringt, der Sieger wird wieder zur
 Figur. Ein Klick aufs Brett überspringt den Kampf, im ⚙-Menü lassen sich Kämpfe, Ton und Musik abschalten.
+Wer mag, stellt dort **„Figuren: lebendig“** ein: Dann stehen alle Figuren dauerhaft als Charaktere auf dem Brett,
+atmen und schauen sich um, marschieren beim Ziehen und gehen ohne Verwandlung direkt in den Kampf.
 Bei Schachmatt kippt der König um.
 
 Alle Klänge und die leise Hintergrundmusik werden im Browser erzeugt (Web Audio) – es gibt keine Sounddateien.
